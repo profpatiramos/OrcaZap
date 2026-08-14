@@ -1,0 +1,4 @@
+export type PricingInput={hours:number;hourlyRate:number;directCosts:number;extraExpenses:number;desiredMargin:number};
+export type PricingOutput={laborCost:number;totalCost:number;minimumPrice:number;recommendedPrice:number;premiumPrice:number;warning?:string};
+const money=(n:number)=>Math.round((n+Number.EPSILON)*100)/100;
+export function calculatePricing(i:PricingInput):PricingOutput{const labor=i.hours*i.hourlyRate;const cost=labor+i.directCosts+i.extraExpenses;const margin=Math.min(Math.max(i.desiredMargin,0),90);const rec=cost/(1-margin/100||1);return{laborCost:money(labor),totalCost:money(cost),minimumPrice:money(cost*1.1),recommendedPrice:money(rec),premiumPrice:money(rec*1.2),warning:margin>=70?"Margem elevada: valide a competitividade do preço.":undefined}}

@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server"; import {pricingSchema} from "@/lib/validations/pricing"; import {calculatePricing} from "@/lib/pricing/engine";
+export async function POST(req:Request){try{const p=pricingSchema.safeParse(await req.json());if(!p.success)return NextResponse.json({error:"Dados de precificação inválidos",details:p.error.flatten()},{status:400});return NextResponse.json({ok:true,result:calculatePricing(p.data)})}catch{return NextResponse.json({error:"Não foi possível processar a solicitação."},{status:500})}}

@@ -1,0 +1,1 @@
+import {z} from "zod"; export const pricingSchema=z.object({hours:z.number().finite().min(0),hourlyRate:z.number().finite().min(0),directCosts:z.number().finite().min(0),extraExpenses:z.number().finite().min(0),desiredMargin:z.number().finite().min(0).max(90)});
