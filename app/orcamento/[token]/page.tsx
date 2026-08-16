@@ -64,6 +64,7 @@ export default async function OrcamentoPublicoPage({
           margin: "0 auto",
         }}
       >
+        {/* CABEÇALHO */}
         <div
           style={{
             background: "#111",
@@ -92,6 +93,7 @@ export default async function OrcamentoPublicoPage({
           </div>
         </div>
 
+        {/* CONTEÚDO */}
         <div
           style={{
             background: "#fff",
@@ -100,6 +102,7 @@ export default async function OrcamentoPublicoPage({
             boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
           }}
         >
+          {/* INFORMAÇÕES PRINCIPAIS */}
           <div
             style={{
               display: "flex",
@@ -167,6 +170,7 @@ export default async function OrcamentoPublicoPage({
             </div>
           </div>
 
+          {/* SERVIÇO */}
           <div
             style={{
               borderTop: "1px solid #eee",
@@ -204,6 +208,7 @@ export default async function OrcamentoPublicoPage({
             )}
           </div>
 
+          {/* ITENS */}
           <div
             style={{
               marginTop: "28px",
@@ -229,6 +234,7 @@ export default async function OrcamentoPublicoPage({
                     marginTop: "14px",
                   }}
                 >
+                  {/* QUANTIDADE */}
                   <div>
                     <span
                       style={{
@@ -243,6 +249,7 @@ export default async function OrcamentoPublicoPage({
                     <strong>{String(item.quantity)}</strong>
                   </div>
 
+                  {/* VALOR UNITÁRIO */}
                   <div>
                     <span
                       style={{
@@ -255,10 +262,11 @@ export default async function OrcamentoPublicoPage({
                     </span>
 
                     <strong>
-                      {formatMoney(item.unitPrice)}
+                      {formatMoney(item.unitPrice.toNumber())}
                     </strong>
                   </div>
 
+                  {/* TOTAL DO ITEM */}
                   <div>
                     <span
                       style={{
@@ -271,7 +279,7 @@ export default async function OrcamentoPublicoPage({
                     </span>
 
                     <strong>
-                      {formatMoney(item.total)}
+                      {formatMoney(item.total.toNumber())}
                     </strong>
                   </div>
                 </div>
@@ -279,6 +287,7 @@ export default async function OrcamentoPublicoPage({
             ))}
           </div>
 
+          {/* TOTAL DA PROPOSTA */}
           <div
             style={{
               marginTop: "32px",
@@ -297,10 +306,10 @@ export default async function OrcamentoPublicoPage({
               Valor total da proposta
             </div>
 
-<AcceptQuoteButton
-  token={token}
-  status={quote.status}
-/>
+            <AcceptQuoteButton
+              token={token}
+              status={quote.status}
+            />
 
             <div
               style={{
@@ -309,10 +318,11 @@ export default async function OrcamentoPublicoPage({
                 fontWeight: 800,
               }}
             >
-              {formatMoney(quote.total)}
+              {formatMoney(quote.total.toNumber())}
             </div>
           </div>
 
+          {/* RODAPÉ */}
           <div
             style={{
               marginTop: "32px",
