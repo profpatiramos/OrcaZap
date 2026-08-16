@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
+
+type QuoteItemInput = {
+  serviceId: string;
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  total?: number;
+  pricingSnapshot?: unknown;
+};
 
 export async function POST(request: Request) {
   try {
@@ -9,11 +19,9 @@ export async function POST(request: Request) {
 
     const {
       customerId,
-      serviceId,
       title,
       description,
-      quantity,
-      unitPrice,
+      items,
       pricingSnapshot,
     } = body;
 
@@ -27,45 +35,122 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!title) {
+    if (!title || !String(title).trim()) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Informe o serviço.",
+          error: "Informe o título do orçamento.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Adicione pelo menos um serviço ao orçamento.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const normalizedItems: QuoteItemInput[] = items
+      .filter(
+        (item: QuoteItemInput) =>
+          item &&
+          item.serviceId &&
+          String(item.serviceId).trim(),
+      )
+      .map((item: QuoteItemInput) => {
+        const quantity =
+          Number(item.quantity) > 0
+            ? Number(item.quantity)
+            : 1;
+
+        const unitPrice =
+          Number(item.unitPrice) >= 0
+            ? Number(item.unitPrice)
+            : 0;
+
+        const total =
+          Number(item.total) >= 0
+            ? Number(item.total)
+            : quantity * unitPrice;
+
+        return {
+          serviceId: String(item.serviceId),
+          description:
+            item.description &&
+            String(item.description).trim()
+              ? String(item.description).trim()
+              : "Serviço",
+          quantity,
+          unitPrice,
+          total,
+          pricingSnapshot:
+            item.pricingSnapshot || null,
+        };
+      });
+
+    if (normalizedItems.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Nenhum serviço válido foi informado.",
         },
         { status: 400 },
       );
     }
 
     /*
-     * Se um serviço foi selecionado, verificamos se ele
-     * pertence à empresa atual e se está ativo.
+     * Confirma que todos os serviços pertencem à empresa
+     * antes de permitir que sejam utilizados no orçamento.
      */
-    let service = null;
+    const serviceIds = [
+      ...new Set(
+        normalizedItems.map(
+          (item) => item.serviceId,
+        ),
+      ),
+    ];
 
-    if (serviceId) {
-      service = await db.service.findFirst({
-        where: {
-          id: serviceId,
-          companyId: COMPANY_ID,
-          active: true,
+    const services = await db.service.findMany({
+      where: {
+        id: {
+          in: serviceIds,
         },
-      });
+        companyId: COMPANY_ID,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
 
-      if (!service) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "O serviço selecionado não foi encontrado.",
-          },
-          { status: 400 },
-        );
-      }
+    if (services.length !== serviceIds.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Um ou mais serviços selecionados não estão disponíveis.",
+        },
+        { status: 400 },
+      );
     }
 
-    const qty = Number(quantity) || 1;
-    const price = Number(unitPrice) || 0;
-    const subtotal = qty * price;
+    const serviceMap = new Map(
+      services.map((service) => [
+        service.id,
+        service.name,
+      ]),
+    );
+
+    const subtotal = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.total || 0),
+      0,
+    );
 
     const number = `ORC-${Date.now()}`;
 
@@ -74,27 +159,52 @@ export async function POST(request: Request) {
         companyId: COMPANY_ID,
         customerId,
         number,
-        title,
-        description: description || null,
+        title: String(title).trim(),
+
+        description:
+          description &&
+          String(description).trim()
+            ? String(description).trim()
+            : null,
+
         subtotal,
         total: subtotal,
+
         status: "DRAFT",
-        pricingSnapshot: pricingSnapshot || null,
+
+        pricingSnapshot:
+          pricingSnapshot
+            ? (pricingSnapshot as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
 
         items: {
-          create: {
-            description: title,
-            quantity: qty,
-            unitPrice: price,
-            total: subtotal,
-            serviceId: serviceId || null,
-            pricingSnapshot: pricingSnapshot || null,
-          },
+          create: normalizedItems.map((item) => ({
+            serviceId: item.serviceId,
+
+            description:
+              item.description ||
+              serviceMap.get(item.serviceId) ||
+              "Serviço",
+
+            quantity: item.quantity || 1,
+
+            unitPrice:
+              item.unitPrice || 0,
+
+            total:
+              item.total || 0,
+
+            pricingSnapshot:
+              item.pricingSnapshot
+                ? (item.pricingSnapshot as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+          })),
         },
       },
 
       include: {
         customer: true,
+
         items: {
           include: {
             service: true,
@@ -108,12 +218,16 @@ export async function POST(request: Request) {
       quote,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Erro ao criar orçamento:",
+      error,
+    );
 
     return NextResponse.json(
       {
         ok: false,
-        error: "Não foi possível salvar o orçamento.",
+        error:
+          "Não foi possível salvar o orçamento.",
       },
       { status: 500 },
     );
@@ -126,14 +240,17 @@ export async function GET() {
       where: {
         companyId: COMPANY_ID,
       },
+
       include: {
         customer: true,
+
         items: {
           include: {
             service: true,
           },
         },
       },
+
       orderBy: {
         createdAt: "desc",
       },
@@ -144,12 +261,16 @@ export async function GET() {
       quotes,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Erro ao carregar orçamentos:",
+      error,
+    );
 
     return NextResponse.json(
       {
         ok: false,
-        error: "Não foi possível carregar os orçamentos.",
+        error:
+          "Não foi possível carregar os orçamentos.",
       },
       { status: 500 },
     );

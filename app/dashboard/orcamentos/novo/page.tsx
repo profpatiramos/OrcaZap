@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
 
@@ -9,6 +9,39 @@ type Customer = {
   name: string;
   email: string | null;
   phone: string | null;
+};
+
+type ServiceCost = {
+  id: string;
+  name: string;
+  amount: string | number;
+  active: boolean;
+};
+
+type Service = {
+  id: string;
+  name: string;
+  description: string | null;
+  baseHourlyRate: string | number | null;
+  defaultQuantity: string | number;
+  active: boolean;
+  costs: ServiceCost[];
+};
+
+type QuoteItem = {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  description: string;
+  quantity: number;
+  hours: number;
+  hourlyRate: number;
+  materials: number;
+  otherExpenses: number;
+  margin: number;
+  unitPrice: number;
+  total: number;
+  pricingSnapshot: unknown;
 };
 
 type PricingResult = {
@@ -29,107 +62,430 @@ type PricingResult = {
 };
 
 function formatMoney(value: number) {
-  return value.toLocaleString("pt-BR", {
+  return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 }
 
+function numberValue(
+  value: string | number | null | undefined,
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return 0;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function createItemId() {
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+}
+
 export default function NovoOrcamento() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+
   const [customerId, setCustomerId] = useState("");
+  const [selectedServiceId, setSelectedServiceId] =
+    useState("");
 
-  const [serviceName, setServiceName] = useState("");
-  const [hours, setHours] = useState("");
-  const [hourlyRate, setHourlyRate] = useState("");
-  const [materials, setMaterials] = useState("");
-  const [otherExpenses, setOtherExpenses] = useState("");
-  const [margin, setMargin] = useState("40");
+  const [items, setItems] = useState<QuoteItem[]>([]);
 
-  const [result, setResult] = useState<PricingResult | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [loadingCustomers, setLoadingCustomers] =
+    useState(true);
+
+  const [loadingServices, setLoadingServices] =
+    useState(true);
+
   const [loading, setLoading] = useState(false);
-  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [calculatingItemId, setCalculatingItemId] =
+    useState<string | null>(null);
+
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadCustomers() {
+    async function loadInitialData() {
       try {
-        const response = await fetch(
-          `/api/customers?companyId=${COMPANY_ID}`
-        );
+        const [
+          customersResponse,
+          servicesResponse,
+        ] = await Promise.all([
+          fetch(
+            `/api/customers?companyId=${COMPANY_ID}`,
+          ),
+          fetch("/api/services"),
+        ]);
 
-        const data = await response.json();
+        const customersData =
+          await customersResponse.json();
 
-        if (response.ok && data.ok) {
-          setCustomers(data.customers || []);
+        const servicesData =
+          await servicesResponse.json();
+
+        if (
+          customersResponse.ok &&
+          customersData.ok
+        ) {
+          setCustomers(
+            customersData.customers || [],
+          );
+        } else {
+          setError(
+            "Não foi possível carregar os clientes.",
+          );
+        }
+
+        if (
+          servicesResponse.ok &&
+          servicesData.ok
+        ) {
+          setServices(
+            servicesData.services || [],
+          );
+        } else {
+          setError(
+            "Não foi possível carregar os serviços.",
+          );
         }
       } catch {
-        setError("Não foi possível carregar os clientes.");
+        setError(
+          "Não foi possível carregar os dados.",
+        );
       } finally {
         setLoadingCustomers(false);
+        setLoadingServices(false);
       }
     }
 
-    loadCustomers();
+    loadInitialData();
   }, []);
 
-  async function handleCalculate() {
-    if (!customerId) {
-      setError("Selecione um cliente antes de calcular o orçamento.");
-      return;
-    }
+  const activeServices = services.filter(
+    (service) => service.active,
+  );
 
-    if (!serviceName.trim()) {
-      setError("Informe o nome do serviço.");
-      return;
-    }
+  const selectedCustomer = customers.find(
+    (customer) => customer.id === customerId,
+  );
 
-    setLoading(true);
+  const availableServices = activeServices.filter(
+    (service) =>
+      !items.some(
+        (item) => item.serviceId === service.id,
+      ),
+  );
+
+  const subtotal = useMemo(() => {
+    return items.reduce(
+      (sum, item) => sum + item.total,
+      0,
+    );
+  }, [items]);
+
+  const calculatedItems = useMemo(() => {
+    return items.filter(
+      (item) => item.total > 0,
+    ).length;
+  }, [items]);
+
+  function addService() {
     setError("");
-    setResult(null);
+
+    if (!selectedServiceId) {
+      setError(
+        "Selecione um serviço para adicioná-lo.",
+      );
+      return;
+    }
+
+    const service = services.find(
+      (item) => item.id === selectedServiceId,
+    );
+
+    if (!service) {
+      setError("Serviço não encontrado.");
+      return;
+    }
+
+    const alreadyAdded = items.some(
+      (item) => item.serviceId === service.id,
+    );
+
+    if (alreadyAdded) {
+      setError(
+        "Esse serviço já está no orçamento.",
+      );
+      return;
+    }
+
+    const defaultQuantity =
+      numberValue(service.defaultQuantity) > 0
+        ? numberValue(service.defaultQuantity)
+        : 1;
+
+    const hourlyRate = numberValue(
+      service.baseHourlyRate,
+    );
+
+    const materials = service.costs
+      .filter((cost) => cost.active)
+      .reduce(
+        (total, cost) =>
+          total + numberValue(cost.amount),
+        0,
+      );
+
+    const newItem: QuoteItem = {
+      id: createItemId(),
+      serviceId: service.id,
+      serviceName: service.name,
+      description:
+        service.description || service.name,
+      quantity: defaultQuantity,
+      hours: 0,
+      hourlyRate,
+      materials,
+      otherExpenses: 0,
+      margin: 40,
+      unitPrice: 0,
+      total: 0,
+      pricingSnapshot: null,
+    };
+
+    setItems((current) => [
+      ...current,
+      newItem,
+    ]);
+
+    setSelectedServiceId("");
+  }
+
+  function removeItem(id: string) {
+    setItems((current) =>
+      current.filter(
+        (item) => item.id !== id,
+      ),
+    );
+  }
+
+  function updateItem(
+    id: string,
+    field: keyof QuoteItem,
+    value: string | number,
+  ) {
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        if (field === "description") {
+          return {
+            ...item,
+            description: String(value),
+          };
+        }
+
+        return {
+          ...item,
+          [field]:
+            typeof value === "string"
+              ? numberValue(value)
+              : value,
+          ...(field === "quantity"
+            ? {
+                unitPrice: item.unitPrice,
+                total:
+                  numberValue(value) *
+                  item.unitPrice,
+              }
+            : {}),
+        };
+      }),
+    );
+  }
+
+  async function calculateItem(
+    item: QuoteItem,
+  ) {
+    setError("");
+    setCalculatingItemId(item.id);
 
     try {
-      const response = await fetch("/api/pricing/calculate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "/api/pricing/calculate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            quantity:
+              item.quantity > 0
+                ? item.quantity
+                : 1,
+
+            hours:
+              item.hours > 0
+                ? item.hours
+                : 0,
+
+            hourlyRate:
+              item.hourlyRate >= 0
+                ? item.hourlyRate
+                : 0,
+
+            materials:
+              item.materials >= 0
+                ? item.materials
+                : 0,
+
+            thirdPartyCosts: 0,
+
+            travelExpenses: 0,
+
+            otherExpenses:
+              item.otherExpenses >= 0
+                ? item.otherExpenses
+                : 0,
+
+            taxRate: 0,
+
+            desiredMargin:
+              item.margin >= 0
+                ? item.margin
+                : 40,
+          }),
         },
-        body: JSON.stringify({
-          quantity: 1,
-          hours: Number(hours) || 0,
-          hourlyRate: Number(hourlyRate) || 0,
-          materials: Number(materials) || 0,
-          thirdPartyCosts: 0,
-          travelExpenses: 0,
-          otherExpenses: Number(otherExpenses) || 0,
-          taxRate: 0,
-          desiredMargin: Number(margin) || 0,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.error || "Não foi possível calcular o preço."
+          data.error ||
+            "Não foi possível calcular o preço.",
         );
       }
 
-      setResult(data.result);
+      const result: PricingResult =
+        data.result;
+
+      setItems((current) =>
+        current.map((currentItem) => {
+          if (
+            currentItem.id !== item.id
+          ) {
+            return currentItem;
+          }
+
+          return {
+            ...currentItem,
+            unitPrice:
+              result.recommendedPrice,
+            total:
+              result.recommendedPrice *
+              currentItem.quantity,
+            pricingSnapshot: {
+              result,
+              inputs: {
+                quantity:
+                  currentItem.quantity,
+                hours:
+                  currentItem.hours,
+                hourlyRate:
+                  currentItem.hourlyRate,
+                materials:
+                  currentItem.materials,
+                otherExpenses:
+                  currentItem.otherExpenses,
+                margin:
+                  currentItem.margin,
+              },
+              service: {
+                id:
+                  currentItem.serviceId,
+                name:
+                  currentItem.serviceName,
+              },
+            },
+          };
+        }),
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível calcular o preço."
+          : "Não foi possível calcular o preço.",
       );
+    } finally {
+      setCalculatingItemId(null);
+    }
+  }
+
+  async function calculateAll() {
+    if (!customerId) {
+      setError(
+        "Selecione um cliente antes de calcular.",
+      );
+      return;
+    }
+
+    if (items.length === 0) {
+      setError(
+        "Adicione pelo menos um serviço.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      for (const item of items) {
+        await calculateItem(item);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSaveQuote() {
-    if (!result || !customerId || !serviceName.trim()) {
-      setError("Calcule o preço antes de salvar o orçamento.");
+    if (!customerId) {
+      setError("Selecione um cliente.");
+      return;
+    }
+
+    if (items.length === 0) {
+      setError(
+        "Adicione pelo menos um serviço.",
+      );
+      return;
+    }
+
+    const invalidItem = items.find(
+      (item) =>
+        item.unitPrice <= 0 ||
+        item.total <= 0,
+    );
+
+    if (invalidItem) {
+      setError(
+        "Calcule o preço de todos os serviços antes de salvar.",
+      );
       return;
     }
 
@@ -137,383 +493,1703 @@ export default function NovoOrcamento() {
     setError("");
 
     try {
-      const response = await fetch("/api/quotes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          customerId,
-          title: serviceName,
-          description: `Serviço: ${serviceName}`,
-          quantity: 1,
-          unitPrice: result.recommendedPrice,
-          pricingSnapshot: {
-            result,
-            inputs: {
-              hours: Number(hours) || 0,
-              hourlyRate: Number(hourlyRate) || 0,
-              materials: Number(materials) || 0,
-              otherExpenses: Number(otherExpenses) || 0,
-              margin: Number(margin) || 0,
-            },
+      const response = await fetch(
+        "/api/quotes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
           },
-        }),
-      });
+          body: JSON.stringify({
+            customerId,
+
+            title:
+              title.trim() ||
+              items
+                .map(
+                  (item) =>
+                    item.serviceName,
+                )
+                .join(" + "),
+
+            description:
+              description.trim() ||
+              null,
+
+            pricingSnapshot: {
+              items: items.map(
+                (item) =>
+                  item.pricingSnapshot,
+              ),
+            },
+
+            items: items.map((item) => ({
+              serviceId:
+                item.serviceId,
+
+              description:
+                item.description ||
+                item.serviceName,
+
+              quantity:
+                item.quantity,
+
+              unitPrice:
+                item.unitPrice,
+
+              total:
+                item.total,
+
+              pricingSnapshot:
+                item.pricingSnapshot,
+            })),
+          }),
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.error || "Não foi possível salvar o orçamento."
+          data.error ||
+            "Não foi possível salvar o orçamento.",
         );
       }
 
-      window.location.href = `/dashboard/orcamentos/${data.quote.id}`;
+      window.location.href =
+        `/dashboard/orcamentos/${data.quote.id}`;
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível salvar o orçamento."
+          : "Não foi possível salvar o orçamento.",
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const selectedCustomer = customers.find(
-    (customer) => customer.id === customerId
-  );
-
   return (
-    <main className="app-page">
-      <header className="app-header">
-        <div className="brand">
-          Orça<span>Zap</span>
+    <main
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)",
+        paddingBottom: 60,
+      }}
+    >
+      <header
+        style={{
+          height: 72,
+          background: "#ffffff",
+          borderBottom:
+            "1px solid #e5e7eb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 32px",
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 24,
+            fontWeight: 800,
+            letterSpacing: "-0.04em",
+          }}
+        >
+          Orca
+          <span style={{ color: "#2563eb" }}>
+            Zap
+          </span>
         </div>
 
-        <div className="header-label">Novo orçamento</div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#64748b",
+          }}
+        >
+          Novo orçamento
+        </div>
       </header>
 
-      <section className="app-container">
-
-        <div className="page-intro">
-          <div>
-            <div className="eyebrow">NOVO ORÇAMENTO</div>
-
-            <h1 className="page-title">
-              Vamos criar sua proposta.
-            </h1>
-
-            <p className="page-subtitle">
-              Escolha o cliente, informe os dados do serviço e descubra
-              quanto cobrar.
-            </p>
+      <section
+        style={{
+          maxWidth: 1180,
+          margin: "0 auto",
+          padding: "36px 24px",
+        }}
+      >
+        <div
+          style={{
+            marginBottom: 28,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              color: "#2563eb",
+              marginBottom: 8,
+            }}
+          >
+            NOVO ORÇAMENTO
           </div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 34,
+              lineHeight: 1.1,
+              letterSpacing: "-0.04em",
+              color: "#0f172a",
+            }}
+          >
+            Monte sua proposta
+          </h1>
+
+          <p
+            style={{
+              margin:
+                "10px 0 0",
+              maxWidth: 680,
+              color: "#64748b",
+              fontSize: 16,
+              lineHeight: 1.6,
+            }}
+          >
+            Selecione o cliente e adicione
+            todos os serviços necessários.
+            O OrcaZap calcula cada item e
+            soma automaticamente a proposta.
+          </p>
         </div>
 
-        <div className="form-card">
+        {error && (
+          <div
+            style={{
+              background: "#fef2f2",
+              border:
+                "1px solid #fecaca",
+              color: "#b91c1c",
+              borderRadius: 12,
+              padding: "13px 16px",
+              marginBottom: 20,
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-          <div className="form-card-header">
-            <div className="step-number">1</div>
+        {/* CLIENTE */}
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            marginBottom: 20,
+            boxShadow:
+              "0 4px 18px rgba(15, 23, 42, 0.04)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                background: "#eff6ff",
+                color: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+              }}
+            >
+              1
+            </div>
 
             <div>
-              <h2>Cliente</h2>
-              <p>Para quem você está preparando este orçamento?</p>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 19,
+                  color: "#0f172a",
+                }}
+              >
+                Cliente
+              </h2>
+
+              <p
+                style={{
+                  margin:
+                    "4px 0 0",
+                  color: "#64748b",
+                  fontSize: 14,
+                }}
+              >
+                Quem receberá esta proposta?
+              </p>
             </div>
           </div>
 
-          <div className="form-field">
-            <label htmlFor="customer">
-              Cliente
-            </label>
+          {loadingCustomers ? (
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: 14,
+              }}
+            >
+              Carregando clientes...
+            </div>
+          ) : customers.length === 0 ? (
+            <div
+              style={{
+                padding: 16,
+                background: "#f8fafc",
+                borderRadius: 10,
+                color: "#64748b",
+              }}
+            >
+              Nenhum cliente cadastrado.
+            </div>
+          ) : (
+            <div>
+              <label
+                htmlFor="customer"
+                style={{
+                  display: "block",
+                  marginBottom: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#334155",
+                }}
+              >
+                Cliente
+              </label>
 
-            {loadingCustomers ? (
-              <div className="loading-field">
-                Carregando clientes...
-              </div>
-            ) : customers.length === 0 ? (
-              <div className="empty-field">
-                Nenhum cliente cadastrado. Cadastre um cliente antes de
-                criar um orçamento.
-              </div>
-            ) : (
-              <>
-                <select
-                  id="customer"
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                >
-                  <option value="">
-                    Selecione um cliente
-                  </option>
+              <select
+                id="customer"
+                value={customerId}
+                onChange={(event) =>
+                  setCustomerId(
+                    event.target.value,
+                  )
+                }
+                style={{
+                  width: "100%",
+                  height: 48,
+                  border:
+                    "1px solid #cbd5e1",
+                  borderRadius: 10,
+                  padding: "0 14px",
+                  fontSize: 15,
+                  background: "#fff",
+                  color: "#0f172a",
+                }}
+              >
+                <option value="">
+                  Selecione um cliente
+                </option>
 
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
+                {customers.map(
+                  (customer) => (
+                    <option
+                      key={customer.id}
+                      value={customer.id}
+                    >
                       {customer.name}
                     </option>
-                  ))}
-                </select>
-
-                {selectedCustomer && (
-                  <div className="customer-info">
-                    {selectedCustomer.email && (
-                      <span>{selectedCustomer.email}</span>
-                    )}
-
-                    {selectedCustomer.phone && (
-                      <span>{selectedCustomer.phone}</span>
-                    )}
-                  </div>
+                  ),
                 )}
-              </>
-            )}
-          </div>
-        </div>
+              </select>
 
-        <div className="form-card">
+              {selectedCustomer && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 18,
+                    marginTop: 10,
+                    color: "#64748b",
+                    fontSize: 13,
+                  }}
+                >
+                  {selectedCustomer.email && (
+                    <span>
+                      {selectedCustomer.email}
+                    </span>
+                  )}
 
-          <div className="form-card-header">
-            <div className="step-number">2</div>
-
-            <div>
-              <h2>Dados do serviço</h2>
-              <p>Informe os custos para calcular um preço adequado.</p>
-            </div>
-          </div>
-
-          <div className="form-grid">
-
-            <div className="form-field full-width">
-              <label htmlFor="serviceName">
-                Nome do serviço
-              </label>
-
-              <input
-                id="serviceName"
-                type="text"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                placeholder="Ex.: Instalação elétrica"
-              />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="hours">
-                Horas de trabalho
-              </label>
-
-              <input
-                id="hours"
-                type="number"
-                min="0"
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-                placeholder="Ex.: 8"
-              />
-              <span className="field-help">
-                Quantidade de horas previstas
-              </span>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="hourlyRate">
-                Valor da hora
-              </label>
-
-              <input
-                id="hourlyRate"
-                type="number"
-                min="0"
-                step="0.01"
-                value={hourlyRate}
-                onChange={(e) => setHourlyRate(e.target.value)}
-                placeholder="Ex.: 80"
-              />
-              <span className="field-help">
-                Quanto vale sua hora de trabalho
-              </span>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="materials">
-                Materiais
-              </label>
-
-              <input
-                id="materials"
-                type="number"
-                min="0"
-                step="0.01"
-                value={materials}
-                onChange={(e) => setMaterials(e.target.value)}
-                placeholder="0,00"
-              />
-              <span className="field-help">
-                Materiais utilizados no serviço
-              </span>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="otherExpenses">
-                Outros custos
-              </label>
-
-              <input
-                id="otherExpenses"
-                type="number"
-                min="0"
-                step="0.01"
-                value={otherExpenses}
-                onChange={(e) => setOtherExpenses(e.target.value)}
-                placeholder="0,00"
-              />
-              <span className="field-help">
-                Deslocamento, taxas e outros gastos
-              </span>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="margin">
-                Margem desejada
-              </label>
-
-              <div className="input-suffix">
-                <input
-                  id="margin"
-                  type="number"
-                  min="0"
-                  max="90"
-                  value={margin}
-                  onChange={(e) => setMargin(e.target.value)}
-                  placeholder="40"
-                />
-                <span>%</span>
-              </div>
-
-              <span className="field-help">
-                Margem de lucro desejada
-              </span>
-            </div>
-
-          </div>
-
-          {error && (
-            <div className="error-box">
-              {error}
+                  {selectedCustomer.phone && (
+                    <span>
+                      {selectedCustomer.phone}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
+        </section>
 
-          <div className="form-actions">
+        {/* SERVIÇOS */}
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            marginBottom: 20,
+            boxShadow:
+              "0 4px 18px rgba(15, 23, 42, 0.04)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 20,
+              marginBottom: 22,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  background: "#eff6ff",
+                  color: "#2563eb",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 800,
+                }}
+              >
+                2
+              </div>
+
+              <div>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 19,
+                    color: "#0f172a",
+                  }}
+                >
+                  Serviços da proposta
+                </h2>
+
+                <p
+                  style={{
+                    margin:
+                      "4px 0 0",
+                    color: "#64748b",
+                    fontSize: 14,
+                  }}
+                >
+                  Adicione quantos serviços
+                  forem necessários.
+                </p>
+              </div>
+            </div>
+
+            {items.length > 0 && (
+              <div
+                style={{
+                  background: "#f1f5f9",
+                  borderRadius: 999,
+                  padding:
+                    "7px 12px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#475569",
+                }}
+              >
+                {items.length}{" "}
+                {items.length === 1
+                  ? "serviço"
+                  : "serviços"}
+              </div>
+            )}
+          </div>
+
+          {/* ADICIONAR SERVIÇO */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "1fr auto",
+              gap: 12,
+              alignItems: "end",
+              padding: 16,
+              background: "#f8fafc",
+              border:
+                "1px solid #e2e8f0",
+              borderRadius: 14,
+              marginBottom: 22,
+            }}
+          >
+            <div>
+              <label
+                htmlFor="service"
+                style={{
+                  display: "block",
+                  marginBottom: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#334155",
+                }}
+              >
+                Escolha um serviço cadastrado
+              </label>
+
+              {loadingServices ? (
+                <div
+                  style={{
+                    height: 48,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "#64748b",
+                    fontSize: 14,
+                  }}
+                >
+                  Carregando serviços...
+                </div>
+              ) : activeServices.length ===
+                0 ? (
+                <div
+                  style={{
+                    height: 48,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "#64748b",
+                    fontSize: 14,
+                  }}
+                >
+                  Nenhum serviço cadastrado.
+                </div>
+              ) : (
+                <select
+                  id="service"
+                  value={selectedServiceId}
+                  onChange={(event) =>
+                    setSelectedServiceId(
+                      event.target.value,
+                    )
+                  }
+                  style={{
+                    width: "100%",
+                    height: 48,
+                    border:
+                      "1px solid #cbd5e1",
+                    borderRadius: 10,
+                    padding:
+                      "0 14px",
+                    fontSize: 15,
+                    background:
+                      "#ffffff",
+                    color: "#0f172a",
+                  }}
+                >
+                  <option value="">
+                    Selecione um serviço
+                  </option>
+
+                  {availableServices.map(
+                    (service) => (
+                      <option
+                        key={service.id}
+                        value={service.id}
+                      >
+                        {service.name}
+                      </option>
+                    ),
+                  )}
+                </select>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={handleCalculate}
-              disabled={loading || !customerId}
-              className="primary-button"
+              onClick={addService}
+              disabled={
+                !selectedServiceId ||
+                loadingServices
+              }
+              style={{
+                height: 48,
+                border: "none",
+                borderRadius: 10,
+                padding:
+                  "0 20px",
+                background:
+                  selectedServiceId
+                    ? "#2563eb"
+                    : "#cbd5e1",
+                color: "#ffffff",
+                fontWeight: 800,
+                cursor:
+                  selectedServiceId
+                    ? "pointer"
+                    : "not-allowed",
+                whiteSpace:
+                  "nowrap",
+              }}
             >
-              {loading ? "Calculando..." : "Calcular preço"}
+              + Adicionar serviço
             </button>
           </div>
 
-        </div>
+          {/* LISTA ILIMITADA DE SERVIÇOS */}
+          {items.length === 0 ? (
+            <div
+              style={{
+                padding:
+                  "42px 20px",
+                textAlign: "center",
+                border:
+                  "1px dashed #cbd5e1",
+                borderRadius: 14,
+                background: "#fafafa",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 28,
+                  marginBottom: 8,
+                  color: "#94a3b8",
+                }}
+              >
+                +
+              </div>
 
-        {result && (
-          <div className="result-card-new">
+              <strong
+                style={{
+                  display: "block",
+                  color: "#334155",
+                  marginBottom: 5,
+                }}
+              >
+                Nenhum serviço adicionado
+              </strong>
 
-            <div className="result-header">
+              <span
+                style={{
+                  color: "#94a3b8",
+                  fontSize: 14,
+                }}
+              >
+                Escolha um serviço acima
+                para começar.
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
+              {items.map((item, index) => {
+                const isCalculating =
+                  calculatingItemId ===
+                  item.id;
+
+                return (
+                  <article
+                    key={item.id}
+                    style={{
+                      border:
+                        "1px solid #e2e8f0",
+                      borderRadius: 14,
+                      overflow: "hidden",
+                      background:
+                        "#ffffff",
+                    }}
+                  >
+                    {/* CABEÇALHO DO ITEM */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "space-between",
+                        gap: 16,
+                        padding:
+                          "15px 18px",
+                        background:
+                          "#f8fafc",
+                        borderBottom:
+                          "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems:
+                            "center",
+                          gap: 12,
+                          minWidth: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 9,
+                            background:
+                              "#dbeafe",
+                            color:
+                              "#1d4ed8",
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {index + 1}
+                        </span>
+
+                        <div
+                          style={{
+                            minWidth: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color:
+                                "#64748b",
+                              letterSpacing:
+                                "0.08em",
+                              marginBottom: 2,
+                            }}
+                          >
+                            SERVIÇO
+                          </div>
+
+                          <h3
+                            style={{
+                              margin: 0,
+                              fontSize: 16,
+                              color:
+                                "#0f172a",
+                              whiteSpace:
+                                "nowrap",
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                            }}
+                          >
+                            {item.serviceName}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeItem(
+                            item.id,
+                          )
+                        }
+                        style={{
+                          border:
+                            "1px solid #fecaca",
+                          background:
+                            "#fff",
+                          color:
+                            "#dc2626",
+                          borderRadius: 8,
+                          padding:
+                            "7px 11px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor:
+                            "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+
+                    {/* CAMPOS DO ITEM */}
+                    <div
+                      style={{
+                        padding: 18,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "2fr 1fr 1fr 1fr",
+                          gap: 12,
+                          marginBottom: 12,
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Descrição
+                          </label>
+
+                          <input
+                            type="text"
+                            value={
+                              item.description
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "description",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                              color:
+                                "#0f172a",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Quantidade
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={
+                              item.quantity
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "quantity",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Horas
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={
+                              item.hours
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "hours",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Valor/hora
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={
+                              item.hourlyRate
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "hourlyRate",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "1fr 1fr 1fr 1fr",
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Materiais
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={
+                              item.materials
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "materials",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Outros custos
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={
+                              item.otherExpenses
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateItem(
+                                item.id,
+                                "otherExpenses",
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "1px solid #cbd5e1",
+                              borderRadius:
+                                9,
+                              padding:
+                                "0 11px",
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 12,
+                              fontWeight:
+                                700,
+                              color:
+                                "#475569",
+                              marginBottom:
+                                6,
+                            }}
+                          >
+                            Margem
+                          </label>
+
+                          <div
+                            style={{
+                              position:
+                                "relative",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              step="1"
+                              value={
+                                item.margin
+                              }
+                              onChange={(
+                                event,
+                              ) =>
+                                updateItem(
+                                  item.id,
+                                  "margin",
+                                  event
+                                    .target
+                                    .value,
+                                )
+                              }
+                              style={{
+                                width:
+                                  "100%",
+                                height: 42,
+                                border:
+                                  "1px solid #cbd5e1",
+                                borderRadius:
+                                  9,
+                                padding:
+                                  "0 32px 0 11px",
+                                fontSize: 14,
+                              }}
+                            />
+
+                            <span
+                              style={{
+                                position:
+                                  "absolute",
+                                right: 11,
+                                top: 11,
+                                color:
+                                  "#64748b",
+                                fontSize:
+                                  13,
+                              }}
+                            >
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "end",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              calculateItem(
+                                item,
+                              )
+                            }
+                            disabled={
+                              isCalculating ||
+                              loading
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              height: 42,
+                              border:
+                                "none",
+                              borderRadius:
+                                9,
+                              background:
+                                "#0f172a",
+                              color:
+                                "#ffffff",
+                              fontWeight:
+                                800,
+                              cursor:
+                                "pointer",
+                            }}
+                          >
+                            {isCalculating
+                              ? "Calculando..."
+                              : "Calcular item"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* RESULTADO DO ITEM */}
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "space-between",
+                        gap: 20,
+                        padding:
+                          "13px 18px",
+                        background:
+                          item.total > 0
+                            ? "#f0fdf4"
+                            : "#f8fafc",
+                        borderTop:
+                          "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display:
+                            "flex",
+                          gap: 28,
+                        }}
+                      >
+                        <div>
+                          <span
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 11,
+                              color:
+                                "#64748b",
+                              marginBottom:
+                                2,
+                            }}
+                          >
+                            PREÇO UNITÁRIO
+                          </span>
+
+                          <strong
+                            style={{
+                              color:
+                                "#0f172a",
+                            }}
+                          >
+                            {formatMoney(
+                              item.unitPrice,
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span
+                            style={{
+                              display:
+                                "block",
+                              fontSize: 11,
+                              color:
+                                "#64748b",
+                              marginBottom:
+                                2,
+                            }}
+                          >
+                            TOTAL DO ITEM
+                          </span>
+
+                          <strong
+                            style={{
+                              color:
+                                item.total >
+                                0
+                                  ? "#15803d"
+                                  : "#64748b",
+                              fontSize: 16,
+                            }}
+                          >
+                            {formatMoney(
+                              item.total,
+                            )}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {item.total > 0 && (
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color:
+                              "#15803d",
+                          }}
+                        >
+                          Calculado
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <div
+              style={{
+                marginTop: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  "space-between",
+                gap: 16,
+                paddingTop: 18,
+                borderTop:
+                  "1px solid #e2e8f0",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#64748b",
+                }}
+              >
+                {calculatedItems} de{" "}
+                {items.length}{" "}
+                {items.length === 1
+                  ? "serviço calculado"
+                  : "serviços calculados"}
+              </div>
+
+              <button
+                type="button"
+                onClick={calculateAll}
+                disabled={loading}
+                style={{
+                  height: 44,
+                  border:
+                    "1px solid #2563eb",
+                  borderRadius: 10,
+                  padding:
+                    "0 18px",
+                  background:
+                    "#eff6ff",
+                  color:
+                    "#1d4ed8",
+                  fontWeight: 800,
+                  cursor:
+                    loading
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {loading
+                  ? "Calculando..."
+                  : "Calcular todos os serviços"}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* INFORMAÇÕES */}
+        <section
+          style={{
+            background: "#ffffff",
+            border:
+              "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            marginBottom: 20,
+            boxShadow:
+              "0 4px 18px rgba(15, 23, 42, 0.04)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                background: "#eff6ff",
+                color: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+              }}
+            >
+              3
+            </div>
+
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 19,
+                  color: "#0f172a",
+                }}
+              >
+                Informações da proposta
+              </h2>
+
+              <p
+                style={{
+                  margin:
+                    "4px 0 0",
+                  color: "#64748b",
+                  fontSize: 14,
+                }}
+              >
+                Personalize o que será
+                apresentado ao cliente.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+            }}
+          >
+            <div>
+              <label
+                htmlFor="title"
+                style={{
+                  display: "block",
+                  marginBottom: 7,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#334155",
+                }}
+              >
+                Título do orçamento
+              </label>
+
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(event) =>
+                  setTitle(
+                    event.target.value,
+                  )
+                }
+                placeholder="Ex.: Reforma elétrica residencial"
+                style={{
+                  width: "100%",
+                  height: 46,
+                  border:
+                    "1px solid #cbd5e1",
+                  borderRadius: 10,
+                  padding:
+                    "0 13px",
+                  fontSize: 14,
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="description"
+                style={{
+                  display: "block",
+                  marginBottom: 7,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#334155",
+                }}
+              >
+                Observações
+              </label>
+
+              <textarea
+                id="description"
+                rows={4}
+                value={description}
+                onChange={(event) =>
+                  setDescription(
+                    event.target.value,
+                  )
+                }
+                placeholder="Informações adicionais para o cliente..."
+                style={{
+                  width: "100%",
+                  border:
+                    "1px solid #cbd5e1",
+                  borderRadius: 10,
+                  padding:
+                    "12px 13px",
+                  fontSize: 14,
+                  resize: "vertical",
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* RESUMO FINAL */}
+        {items.length > 0 && (
+          <section
+            style={{
+              background:
+                "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+              color: "#ffffff",
+              borderRadius: 20,
+              padding: 26,
+              boxShadow:
+                "0 12px 30px rgba(15, 23, 42, 0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent:
+                  "space-between",
+                gap: 30,
+              }}
+            >
               <div>
-                <div className="eyebrow">
-                  RESULTADO DA PRECIFICAÇÃO
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing:
+                      "0.12em",
+                    color: "#93c5fd",
+                    marginBottom: 8,
+                  }}
+                >
+                  RESUMO DA PROPOSTA
                 </div>
 
-                <h2>{serviceName}</h2>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 23,
+                    letterSpacing:
+                      "-0.03em",
+                  }}
+                >
+                  {title ||
+                    "Sua proposta"}
+                </h2>
 
-                <p>
-                  Cliente: <strong>{selectedCustomer?.name}</strong>
+                <p
+                  style={{
+                    margin:
+                      "7px 0 0",
+                    color: "#cbd5e1",
+                    fontSize: 14,
+                  }}
+                >
+                  Cliente:{" "}
+                  <strong
+                    style={{
+                      color: "#ffffff",
+                    }}
+                  >
+                    {selectedCustomer?.name ||
+                      "não selecionado"}
+                  </strong>
                 </p>
               </div>
 
-              <div className="recommended-price">
-                <span>Preço recomendado</span>
-                <strong>
-                  {formatMoney(result.recommendedPrice)}
+              <div
+                style={{
+                  textAlign:
+                    "right",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    display:
+                      "block",
+                    color: "#cbd5e1",
+                    fontSize: 12,
+                    marginBottom: 4,
+                  }}
+                >
+                  TOTAL DA PROPOSTA
+                </span>
+
+                <strong
+                  style={{
+                    display:
+                      "block",
+                    fontSize: 30,
+                    letterSpacing:
+                      "-0.04em",
+                  }}
+                >
+                  {formatMoney(subtotal)}
                 </strong>
               </div>
             </div>
 
-            <p className="result-description">
-              Este é o valor recomendado para atingir a margem
-              informada.
-            </p>
+            <div
+              style={{
+                marginTop: 22,
+                borderTop:
+                  "1px solid rgba(255,255,255,0.12)",
+                paddingTop: 16,
+                display:
+                  "flex",
+                flexDirection:
+                  "column",
+                gap: 9,
+              }}
+            >
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display:
+                      "flex",
+                    justifyContent:
+                      "space-between",
+                    gap: 20,
+                    fontSize: 14,
+                  }}
+                >
+                  <span
+                    style={{
+                      color:
+                        "#cbd5e1",
+                    }}
+                  >
+                    {item.quantity}x{" "}
+                    {item.serviceName}
+                  </span>
 
-            <div className="result-grid-new">
-
-              <div>
-                <span>Custo operacional</span>
-                <strong>
-                  {formatMoney(result.operatingCost)}
-                </strong>
-              </div>
-
-              <div>
-                <span>Custo total</span>
-                <strong>
-                  {formatMoney(result.totalCost)}
-                </strong>
-              </div>
-
-              <div>
-                <span>Preço mínimo</span>
-                <strong>
-                  {formatMoney(result.minimumPrice)}
-                </strong>
-              </div>
-
-              <div>
-                <span>Preço premium</span>
-                <strong>
-                  {formatMoney(result.premiumPrice)}
-                </strong>
-              </div>
-
-              <div>
-                <span>Mão de obra</span>
-                <strong>
-                  {formatMoney(result.laborCost)}
-                </strong>
-              </div>
-
-              <div>
-                <span>Materiais</span>
-                <strong>
-                  {formatMoney(result.materialsCost)}
-                </strong>
-              </div>
-
+                  <strong>
+                    {formatMoney(
+                      item.total,
+                    )}
+                  </strong>
+                </div>
+              ))}
             </div>
 
-            {result.warning && (
-              <div className="warning-box">
-                {result.warning}
-              </div>
-            )}
-
-            <div className="result-actions">
+            <div
+              style={{
+                marginTop: 22,
+                display: "flex",
+                justifyContent:
+                  "flex-end",
+              }}
+            >
               <button
                 type="button"
-                onClick={handleSaveQuote}
-                disabled={loading}
-                className="primary-button"
+                onClick={
+                  handleSaveQuote
+                }
+                disabled={
+                  loading ||
+                  !customerId ||
+                  items.length === 0
+                }
+                style={{
+                  height: 48,
+                  border: "none",
+                  borderRadius: 10,
+                  padding:
+                    "0 24px",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#0f172a",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  cursor:
+                    loading ||
+                    !customerId
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    loading ||
+                    !customerId
+                      ? 0.6
+                      : 1,
+                }}
               >
                 {loading
                   ? "Salvando..."
                   : "Salvar orçamento"}
               </button>
             </div>
-
-          </div>
+          </section>
         )}
-
       </section>
     </main>
   );
