@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
 
@@ -36,6 +37,8 @@ function formatMoney(value: number) {
 }
 
 export default function NovoOrcamento() {
+  const router = useRouter();
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
 
@@ -138,7 +141,29 @@ export default function NovoOrcamento() {
           Orca<span>Zap</span>
         </div>
 
-        <div className="muted">Novo orçamento</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard")}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: 600,
+            }}
+          >
+            ← Dashboard
+          </button>
+
+          <div className="muted">Novo orçamento</div>
+        </div>
       </header>
 
       <section className="main">
@@ -282,9 +307,7 @@ export default function NovoOrcamento() {
 
             <h2>{selectedCustomer?.name}</h2>
 
-            <p className="muted">
-              {serviceName}
-            </p>
+            <p className="muted">{serviceName}</p>
 
             <div className="price-highlight">
               {formatMoney(result.recommendedPrice)}
