@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 type Customer = {
   id: string;
@@ -210,43 +211,36 @@ export default function EditarOrcamentoPage() {
           Orca<span>Zap</span>
         </div>
 
-        <div className="muted">Editar orçamento</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <DashboardBackButton />
+
+          <div className="muted">Editar orçamento</div>
+        </div>
       </header>
 
       <section className="main">
-        <button
-          type="button"
-          onClick={() =>
-            router.push(`/dashboard/orcamentos/${id}`)
-          }
-          style={{
-            marginBottom: "24px",
-            background: "transparent",
-            color: "#555",
-            padding: 0,
-          }}
-        >
-          ← Voltar para orçamento
-        </button>
-
         <div className="eyebrow">EDITAR ORÇAMENTO</div>
 
-        <h1 className="title">Vamos ajustar sua proposta.</h1>
+        <h1 className="title">Editar sua proposta.</h1>
 
         <p className="subtitle">
-          Altere os dados abaixo e salve as mudanças.
+          Altere os dados do cliente ou do serviço e salve as modificações.
         </p>
 
         <div className="card">
           <h2>Cliente</h2>
 
-          <label>Cliente</label>
+          <label>Selecione o cliente</label>
 
           <select
             value={customerId}
-            onChange={(e) =>
-              setCustomerId(e.target.value)
-            }
+            onChange={(e) => setCustomerId(e.target.value)}
           >
             <option value="">
               Selecione um cliente
@@ -261,6 +255,12 @@ export default function EditarOrcamentoPage() {
               </option>
             ))}
           </select>
+
+          {quote.customer && (
+            <p className="muted" style={{ marginTop: "10px" }}>
+              Cliente atual: {quote.customer.name}
+            </p>
+          )}
         </div>
 
         <div
@@ -330,8 +330,8 @@ export default function EditarOrcamentoPage() {
           </div>
 
           <p className="muted">
-            O total será atualizado com base na
-            quantidade e no valor unitário informados.
+            O total será atualizado com base na quantidade
+            e no valor unitário informados.
           </p>
 
           {error && (
