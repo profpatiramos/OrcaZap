@@ -9,6 +9,7 @@ export async function POST(request: Request) {
 
     const {
       customerId,
+      serviceId,
       title,
       description,
       quantity,
@@ -36,6 +37,32 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Se um serviço foi selecionado, verificamos se ele
+     * pertence à empresa atual e se está ativo.
+     */
+    let service = null;
+
+    if (serviceId) {
+      service = await db.service.findFirst({
+        where: {
+          id: serviceId,
+          companyId: COMPANY_ID,
+          active: true,
+        },
+      });
+
+      if (!service) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "O serviço selecionado não foi encontrado.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const qty = Number(quantity) || 1;
     const price = Number(unitPrice) || 0;
     const subtotal = qty * price;
@@ -60,6 +87,7 @@ export async function POST(request: Request) {
             quantity: qty,
             unitPrice: price,
             total: subtotal,
+            serviceId: serviceId || null,
             pricingSnapshot: pricingSnapshot || null,
           },
         },
@@ -67,7 +95,11 @@ export async function POST(request: Request) {
 
       include: {
         customer: true,
-        items: true,
+        items: {
+          include: {
+            service: true,
+          },
+        },
       },
     });
 
@@ -96,7 +128,11 @@ export async function GET() {
       },
       include: {
         customer: true,
-        items: true,
+        items: {
+          include: {
+            service: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
