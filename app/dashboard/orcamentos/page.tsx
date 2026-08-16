@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 type Customer = {
   id: string;
@@ -61,8 +61,6 @@ function formatStatus(status: string) {
 }
 
 export default function OrcamentosPage() {
-  const router = useRouter();
-
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -105,7 +103,17 @@ export default function OrcamentosPage() {
           Orca<span>Zap</span>
         </div>
 
-        <div className="muted">Meus orçamentos</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <DashboardBackButton />
+
+          <div className="muted">Meus orçamentos</div>
+        </div>
       </header>
 
       <section className="main">
@@ -251,11 +259,10 @@ export default function OrcamentosPage() {
                   <button
                     type="button"
                     className="button"
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/orcamentos/${quote.id}`,
-                      )
-                    }
+                    onClick={() => {
+                      window.location.href =
+                        `/dashboard/orcamentos/${quote.id}`;
+                    }}
                   >
                     Abrir orçamento
                   </button>

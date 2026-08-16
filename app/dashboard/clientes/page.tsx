@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
 
@@ -148,19 +149,7 @@ export default function NovoOrcamento() {
             gap: "16px",
           }}
         >
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: 600,
-            }}
-          >
-            ← Dashboard
-          </button>
+          <DashboardBackButton />
 
           <div className="muted">Novo orçamento</div>
         </div>
