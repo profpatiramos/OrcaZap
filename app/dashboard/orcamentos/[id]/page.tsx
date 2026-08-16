@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 type Customer = {
   name: string;
@@ -43,6 +44,34 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
+function formatStatus(status: string) {
+  switch (status) {
+    case "DRAFT":
+      return "Rascunho";
+
+    case "SENT":
+      return "Enviado";
+
+    case "VIEWED":
+      return "Visualizado";
+
+    case "ACCEPTED":
+      return "Aceito";
+
+    case "REJECTED":
+      return "Recusado";
+
+    case "EXPIRED":
+      return "Expirado";
+
+    case "CANCELLED":
+      return "Cancelado";
+
+    default:
+      return status;
+  }
+}
+
 export default function AbrirOrcamentoPage() {
   const params = useParams();
   const router = useRouter();
@@ -61,6 +90,7 @@ export default function AbrirOrcamentoPage() {
     async function loadQuote() {
       try {
         setLoading(true);
+        setError("");
 
         const response = await fetch("/api/quotes");
 
@@ -200,30 +230,23 @@ export default function AbrirOrcamentoPage() {
           Orca<span>Zap</span>
         </div>
 
-        <div className="muted">Orçamento</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <DashboardBackButton />
+
+          <div className="muted">Orçamento</div>
+        </div>
       </header>
 
       <section className="main">
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/orcamentos")}
-          style={{
-            marginBottom: "24px",
-            background: "transparent",
-            color: "#555",
-            padding: 0,
-          }}
-        >
-          ← Voltar para orçamentos
-        </button>
-
-        <div className="eyebrow">ORÇAMENTO</div>
-
-        <h1 className="title">{quote.title}</h1>
-
-        <p className="subtitle">
-          {quote.number} • Criado em {formatDate(quote.createdAt)}
-        </p>
+        <div style={{ marginBottom: "24px" }}>
+          <DashboardBackButton />
+        </div>
 
         <div className="card">
           <div
@@ -231,37 +254,45 @@ export default function AbrirOrcamentoPage() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
-              gap: "24px",
+              gap: "20px",
               flexWrap: "wrap",
             }}
           >
             <div>
-              <div className="eyebrow">CLIENTE</div>
+              <div className="eyebrow">ORÇAMENTO {quote.number}</div>
 
-              <h2>{quote.customer.name}</h2>
+              <h1 className="title">{quote.title}</h1>
 
-              {quote.customer.email && (
-                <p className="muted">
-                  {quote.customer.email}
-                </p>
-              )}
-
-              {quote.customer.phone && (
-                <p className="muted">
-                  {quote.customer.phone}
-                </p>
-              )}
+              <p className="muted">
+                Criado em {formatDate(quote.createdAt)}
+              </p>
             </div>
 
             <div style={{ textAlign: "right" }}>
               <div className="muted">Status</div>
 
-              <strong>
-                {quote.status === "DRAFT"
-                  ? "Rascunho"
-                  : quote.status}
-              </strong>
+              <strong>{formatStatus(quote.status)}</strong>
             </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: "24px",
+              paddingTop: "24px",
+              borderTop: "1px solid #eee",
+            }}
+          >
+            <div className="muted">Cliente</div>
+
+            <h2>{quote.customer?.name}</h2>
+
+            {quote.customer?.email && (
+              <p className="muted">{quote.customer.email}</p>
+            )}
+
+            {quote.customer?.phone && (
+              <p className="muted">{quote.customer.phone}</p>
+            )}
           </div>
         </div>
 
@@ -271,9 +302,7 @@ export default function AbrirOrcamentoPage() {
           <h2>{quote.title}</h2>
 
           {quote.description && (
-            <p className="muted">
-              {quote.description}
-            </p>
+            <p className="muted">{quote.description}</p>
           )}
 
           {quote.items.map((item) => (
@@ -305,9 +334,7 @@ export default function AbrirOrcamentoPage() {
                 </div>
 
                 <div>
-                  <span className="muted">
-                    Valor unitário
-                  </span>
+                  <span className="muted">Valor unitário</span>
 
                   <strong style={{ display: "block" }}>
                     {formatMoney(item.unitPrice)}
@@ -328,9 +355,7 @@ export default function AbrirOrcamentoPage() {
 
         {pricing && (
           <div className="card">
-            <div className="eyebrow">
-              PRECIFICAÇÃO
-            </div>
+            <div className="eyebrow">PRECIFICAÇÃO</div>
 
             <div className="result-grid">
               <div>
@@ -385,9 +410,7 @@ export default function AbrirOrcamentoPage() {
         )}
 
         <div className="card">
-          <div className="eyebrow">
-            TOTAL DO ORÇAMENTO
-          </div>
+          <div className="eyebrow">TOTAL DO ORÇAMENTO</div>
 
           <div className="price-highlight">
             {formatMoney(quote.total)}
@@ -531,7 +554,7 @@ export default function AbrirOrcamentoPage() {
 
                 const message = `Olá, ${quote.customer.name}! Tudo bem?
 
-Preparei com carinho o seu orçamento para o serviço de "${quote.title}".
+Preparei o seu orçamento personalizado para o serviço de "${quote.title}".
 
 Orçamento: ${quote.number}
 Valor total: ${formatMoney(quote.total)}
