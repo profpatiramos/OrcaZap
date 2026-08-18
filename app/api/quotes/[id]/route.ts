@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
+import { getCurrentCompany } from "@/lib/auth";
 
 type Params = {
   params: Promise<{
@@ -14,6 +13,18 @@ export async function PUT(
   { params }: Params,
 ) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -53,7 +64,7 @@ export async function PUT(
     const existingQuote = await db.quote.findFirst({
       where: {
         id,
-        companyId: COMPANY_ID,
+        companyId: company.id,
       },
       include: {
         items: true,
