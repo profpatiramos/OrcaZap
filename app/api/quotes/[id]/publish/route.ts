@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentCompany } from "@/lib/auth";
 import { randomUUID } from "crypto";
 
 type Params = {
@@ -13,11 +14,24 @@ export async function POST(
   { params }: Params,
 ) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const { id } = await params;
 
-    const quote = await db.quote.findUnique({
+    const quote = await db.quote.findFirst({
       where: {
         id,
+        companyId: company.id,
       },
       include: {
         customer: true,
