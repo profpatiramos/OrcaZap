@@ -79,13 +79,77 @@ export async function POST(request: Request) {
       );
     }
 
+    const customer = await db.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId: company.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Cliente não encontrado ou não pertence à sua empresa.",
+        },
+        { status: 400 },
+      );
+    }
+
+    let validatedQuoteId: string | null = null;
+
+    if (quoteId) {
+      const quote = await db.quote.findFirst({
+        where: {
+          id: quoteId,
+          companyId: company.id,
+          customerId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!quote) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Orçamento não encontrado ou não pertence ao cliente informado.",
+          },
+          { status: 400 },
+        );
+      }
+
+      validatedQuoteId = quote.id;
+    }
+
+    const parsedDueAt = new Date(dueAt);
+
+    if (Number.isNaN(parsedDueAt.getTime())) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Data do follow-up inválida.",
+        },
+        { status: 400 },
+      );
+    }
+
     const followUp = await db.followUp.create({
       data: {
         companyId: company.id,
-        customerId,
-        quoteId: quoteId || null,
-        dueAt: new Date(dueAt),
-        suggestedMessage: suggestedMessage || null,
+        customerId: customer.id,
+        quoteId: validatedQuoteId,
+        dueAt: parsedDueAt,
+        suggestedMessage:
+          suggestedMessage
+            ? String(suggestedMessage).trim()
+            : null,
       },
       include: {
         customer: true,
