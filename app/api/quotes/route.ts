@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-
-const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
+import { getCurrentCompany } from "@/lib/auth";
 
 type QuoteItemInput = {
   serviceId: string;
@@ -15,6 +14,18 @@ type QuoteItemInput = {
 
 export async function POST(request: Request) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
 
     const {
@@ -50,6 +61,27 @@ export async function POST(request: Request) {
         {
           ok: false,
           error: "Adicione pelo menos um serviço ao orçamento.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Confirma que o cliente pertence à empresa do usuário.
+    const customer = await db.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId: company.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Cliente não encontrado ou não pertence à sua empresa.",
         },
         { status: 400 },
       );
@@ -104,8 +136,8 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Confirma que todos os serviços pertencem à empresa
-     * antes de permitir que sejam utilizados no orçamento.
+     * Confirma que todos os serviços pertencem
+     * à empresa do usuário autenticado.
      */
     const serviceIds = [
       ...new Set(
@@ -120,7 +152,7 @@ export async function POST(request: Request) {
         id: {
           in: serviceIds,
         },
-        companyId: COMPANY_ID,
+        companyId: company.id,
         active: true,
       },
       select: {
@@ -156,7 +188,7 @@ export async function POST(request: Request) {
 
     const quote = await db.quote.create({
       data: {
-        companyId: COMPANY_ID,
+        companyId: company.id,
         customerId,
         number,
         title: String(title).trim(),
@@ -236,9 +268,21 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const quotes = await db.quote.findMany({
       where: {
-        companyId: COMPANY_ID,
+        companyId: company.id,
       },
 
       include: {
