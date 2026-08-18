@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardBackButton from "@/app/components/DashboardBackButton";
@@ -144,7 +144,7 @@ export default function NovoOrcamento() {
           );
         } else {
           setError(
-            "Não foi possível carregar os clientes.",
+            "NÃ£o foi possÃ­vel carregar os clientes.",
           );
         }
 
@@ -157,12 +157,12 @@ export default function NovoOrcamento() {
           );
         } else {
           setError(
-            "Não foi possível carregar os serviços.",
+            "NÃ£o foi possÃ­vel carregar os serviÃ§os.",
           );
         }
       } catch {
         setError(
-          "Não foi possível carregar os dados.",
+          "NÃ£o foi possÃ­vel carregar os dados.",
         );
       } finally {
         setLoadingCustomers(false);
@@ -206,7 +206,7 @@ export default function NovoOrcamento() {
 
     if (!selectedServiceId) {
       setError(
-        "Selecione um serviço para adicioná-lo.",
+        "Selecione um serviÃ§o para adicionÃ¡-lo.",
       );
       return;
     }
@@ -216,7 +216,7 @@ export default function NovoOrcamento() {
     );
 
     if (!service) {
-      setError("Serviço não encontrado.");
+      setError("ServiÃ§o nÃ£o encontrado.");
       return;
     }
 
@@ -226,7 +226,7 @@ export default function NovoOrcamento() {
 
     if (alreadyAdded) {
       setError(
-        "Esse serviço já está no orçamento.",
+        "Esse serviÃ§o jÃ¡ estÃ¡ no orÃ§amento.",
       );
       return;
     }
@@ -378,7 +378,7 @@ export default function NovoOrcamento() {
       if (!response.ok || !data.ok) {
         throw new Error(
           data.error ||
-            "Não foi possível calcular o preço.",
+            "NÃ£o foi possÃ­vel calcular o preÃ§o.",
         );
       }
 
@@ -430,7 +430,7 @@ export default function NovoOrcamento() {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível calcular o preço.",
+          : "NÃ£o foi possÃ­vel calcular o preÃ§o.",
       );
     } finally {
       setCalculatingItemId(null);
@@ -447,7 +447,7 @@ export default function NovoOrcamento() {
 
     if (items.length === 0) {
       setError(
-        "Adicione pelo menos um serviço.",
+        "Adicione pelo menos um serviÃ§o.",
       );
       return;
     }
@@ -472,7 +472,7 @@ export default function NovoOrcamento() {
 
     if (items.length === 0) {
       setError(
-        "Adicione pelo menos um serviço.",
+        "Adicione pelo menos um serviÃ§o.",
       );
       return;
     }
@@ -485,7 +485,7 @@ export default function NovoOrcamento() {
 
     if (invalidItem) {
       setError(
-        "Calcule o preço de todos os serviços antes de salvar.",
+        "Calcule o preÃ§o de todos os serviÃ§os antes de salvar.",
       );
       return;
     }
@@ -554,7 +554,7 @@ export default function NovoOrcamento() {
       if (!response.ok || !data.ok) {
         throw new Error(
           data.error ||
-            "Não foi possível salvar o orçamento.",
+            "NÃ£o foi possÃ­vel salvar o orÃ§amento.",
         );
       }
 
@@ -564,7 +564,7 @@ export default function NovoOrcamento() {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível salvar o orçamento.",
+          : "NÃ£o foi possÃ­vel salvar o orÃ§amento.",
       );
     } finally {
       setLoading(false);
@@ -615,7 +615,7 @@ export default function NovoOrcamento() {
             color: "#64748b",
           }}
         >
-          Novo orçamento
+          Novo orÃ§amento
         </div>
       </header>
 
@@ -640,7 +640,7 @@ export default function NovoOrcamento() {
               marginBottom: 8,
             }}
           >
-            NOVO ORÇAMENTO
+            NOVO ORÃ‡AMENTO
           </div>
 
           <h1
@@ -666,7 +666,7 @@ export default function NovoOrcamento() {
             }}
           >
             Selecione o cliente e adicione
-            todos os serviços necessários.
+            todos os serviÃ§os necessÃ¡rios.
             O OrcaZap calcula cada item e
             soma automaticamente a proposta.
           </p>
@@ -746,7 +746,7 @@ export default function NovoOrcamento() {
                   fontSize: 14,
                 }}
               >
-                Quem receberá esta proposta?
+                Quem receberÃ¡ esta proposta?
               </p>
             </div>
           </div>
@@ -849,7 +849,7 @@ export default function NovoOrcamento() {
           )}
         </section>
 
-        {/* SERVIÇOS */}
+        {/* SERVIÃ‡OS */}
         <section
           style={{
             background: "#ffffff",
@@ -902,7 +902,7 @@ export default function NovoOrcamento() {
                     color: "#0f172a",
                   }}
                 >
-                  Serviços da proposta
+                  ServiÃ§os da proposta
                 </h2>
 
                 <p
@@ -913,8 +913,8 @@ export default function NovoOrcamento() {
                     fontSize: 14,
                   }}
                 >
-                  Adicione quantos serviços
-                  forem necessários.
+                  Adicione quantos serviÃ§os
+                  forem necessÃ¡rios.
                 </p>
               </div>
             </div>
@@ -933,13 +933,13 @@ export default function NovoOrcamento() {
               >
                 {items.length}{" "}
                 {items.length === 1
-                  ? "serviço"
-                  : "serviços"}
+                  ? "serviÃ§o"
+                  : "serviÃ§os"}
               </div>
             )}
           </div>
 
-          {/* ADICIONAR SERVIÇO */}
+          {/* ADICIONAR SERVIÃ‡O */}
           <div
             style={{
               display: "grid",
@@ -966,7 +966,7 @@ export default function NovoOrcamento() {
                   color: "#334155",
                 }}
               >
-                Escolha um serviço cadastrado
+                Escolha um serviÃ§o cadastrado
               </label>
 
               {loadingServices ? (
@@ -979,7 +979,7 @@ export default function NovoOrcamento() {
                     fontSize: 14,
                   }}
                 >
-                  Carregando serviços...
+                  Carregando serviÃ§os...
                 </div>
               ) : activeServices.length ===
                 0 ? (
@@ -992,7 +992,7 @@ export default function NovoOrcamento() {
                     fontSize: 14,
                   }}
                 >
-                  Nenhum serviço cadastrado.
+                  Nenhum serviÃ§o cadastrado.
                 </div>
               ) : (
                 <select
@@ -1018,7 +1018,7 @@ export default function NovoOrcamento() {
                   }}
                 >
                   <option value="">
-                    Selecione um serviço
+                    Selecione um serviÃ§o
                   </option>
 
                   {availableServices.map(
@@ -1062,11 +1062,11 @@ export default function NovoOrcamento() {
                   "nowrap",
               }}
             >
-              + Adicionar serviço
+              + Adicionar serviÃ§o
             </button>
           </div>
 
-          {/* LISTA ILIMITADA DE SERVIÇOS */}
+          {/* LISTA ILIMITADA DE SERVIÃ‡OS */}
           {items.length === 0 ? (
             <div
               style={{
@@ -1096,7 +1096,7 @@ export default function NovoOrcamento() {
                   marginBottom: 5,
                 }}
               >
-                Nenhum serviço adicionado
+                Nenhum serviÃ§o adicionado
               </strong>
 
               <span
@@ -1105,8 +1105,8 @@ export default function NovoOrcamento() {
                   fontSize: 14,
                 }}
               >
-                Escolha um serviço acima
-                para começar.
+                Escolha um serviÃ§o acima
+                para comeÃ§ar.
               </span>
             </div>
           ) : (
@@ -1134,7 +1134,7 @@ export default function NovoOrcamento() {
                         "#ffffff",
                     }}
                   >
-                    {/* CABEÇALHO DO ITEM */}
+                    {/* CABEÃ‡ALHO DO ITEM */}
                     <div
                       style={{
                         display: "flex",
@@ -1199,7 +1199,7 @@ export default function NovoOrcamento() {
                               marginBottom: 2,
                             }}
                           >
-                            SERVIÇO
+                            SERVIÃ‡O
                           </div>
 
                           <h3
@@ -1278,7 +1278,7 @@ export default function NovoOrcamento() {
                                 6,
                             }}
                           >
-                            Descrição
+                            DescriÃ§Ã£o
                           </label>
 
                           <input
@@ -1730,7 +1730,7 @@ export default function NovoOrcamento() {
                                 2,
                             }}
                           >
-                            PREÇO UNITÁRIO
+                            PREÃ‡O UNITÃRIO
                           </span>
 
                           <strong
@@ -1819,8 +1819,8 @@ export default function NovoOrcamento() {
                 {calculatedItems} de{" "}
                 {items.length}{" "}
                 {items.length === 1
-                  ? "serviço calculado"
-                  : "serviços calculados"}
+                  ? "serviÃ§o calculado"
+                  : "serviÃ§os calculados"}
               </div>
 
               <button
@@ -1847,13 +1847,13 @@ export default function NovoOrcamento() {
               >
                 {loading
                   ? "Calculando..."
-                  : "Calcular todos os serviços"}
+                  : "Calcular todos os serviÃ§os"}
               </button>
             </div>
           )}
         </section>
 
-        {/* INFORMAÇÕES */}
+        {/* INFORMAÃ‡Ã•ES */}
         <section
           style={{
             background: "#ffffff",
@@ -1898,7 +1898,7 @@ export default function NovoOrcamento() {
                   color: "#0f172a",
                 }}
               >
-                Informações da proposta
+                InformaÃ§Ãµes da proposta
               </h2>
 
               <p
@@ -1909,7 +1909,7 @@ export default function NovoOrcamento() {
                   fontSize: 14,
                 }}
               >
-                Personalize o que será
+                Personalize o que serÃ¡
                 apresentado ao cliente.
               </p>
             </div>
@@ -1932,7 +1932,7 @@ export default function NovoOrcamento() {
                   color: "#334155",
                 }}
               >
-                Título do orçamento
+                TÃ­tulo do orÃ§amento
               </label>
 
               <input
@@ -1944,7 +1944,7 @@ export default function NovoOrcamento() {
                     event.target.value,
                   )
                 }
-                placeholder="Ex.: Reforma elétrica residencial"
+                placeholder="Ex.: Reforma elÃ©trica residencial"
                 style={{
                   width: "100%",
                   height: 46,
@@ -1969,7 +1969,7 @@ export default function NovoOrcamento() {
                   color: "#334155",
                 }}
               >
-                Observações
+                ObservaÃ§Ãµes
               </label>
 
               <textarea
@@ -1981,7 +1981,7 @@ export default function NovoOrcamento() {
                     event.target.value,
                   )
                 }
-                placeholder="Informações adicionais para o cliente..."
+                placeholder="InformaÃ§Ãµes adicionais para o cliente..."
                 style={{
                   width: "100%",
                   border:
@@ -2060,7 +2060,7 @@ export default function NovoOrcamento() {
                     }}
                   >
                     {selectedCustomer?.name ||
-                      "não selecionado"}
+                      "nÃ£o selecionado"}
                   </strong>
                 </p>
               </div>
@@ -2186,7 +2186,7 @@ export default function NovoOrcamento() {
               >
                 {loading
                   ? "Salvando..."
-                  : "Salvar orçamento"}
+                  : "Salvar orÃ§amento"}
               </button>
             </div>
           </section>

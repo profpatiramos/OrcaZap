@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 type Customer = {
   id: string;
@@ -94,6 +95,7 @@ export default function FollowUpsPage() {
   ) {
     try {
       setUpdating(id);
+      setError("");
 
       const response = await fetch(`/api/followups/${id}`, {
         method: "PATCH",
@@ -139,12 +141,23 @@ export default function FollowUpsPage() {
 
     const cleanPhone = phone.replace(/\D/g, "");
 
+    if (!cleanPhone) {
+      setError(
+        "O telefone ou WhatsApp cadastrado para este cliente é inválido.",
+      );
+      return;
+    }
+
+    const whatsappPhone = cleanPhone.startsWith("55")
+      ? cleanPhone
+      : `55${cleanPhone}`;
+
     const message =
       followUp.suggestedMessage ||
       `Olá, ${followUp.customer?.name || ""}! Tudo bem? Estou entrando em contato para saber se você conseguiu avaliar o orçamento ${followUp.quote?.number || ""}. Fico à disposição para qualquer dúvida ou ajuste.`;
 
     const url =
-      `https://wa.me/55${cleanPhone}` +
+      `https://wa.me/${whatsappPhone}` +
       `?text=${encodeURIComponent(message)}`;
 
     window.open(url, "_blank");
@@ -158,6 +171,10 @@ export default function FollowUpsPage() {
     (item) => item.status === "COMPLETED",
   );
 
+  const cancelled = followUps.filter(
+    (item) => item.status === "CANCELLED",
+  );
+
   return (
     <main>
       <header className="top">
@@ -165,25 +182,20 @@ export default function FollowUpsPage() {
           Orca<span>Zap</span>
         </div>
 
-        <div className="muted">Follow-ups</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <DashboardBackButton />
+
+          <div className="muted">Follow-ups</div>
+        </div>
       </header>
 
       <section className="main">
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          style={{
-            marginBottom: "24px",
-            background: "transparent",
-            color: "#555",
-            padding: 0,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          ← Voltar ao painel
-        </button>
-
         <div className="eyebrow">FOLLOW-UPS</div>
 
         <h1 className="title">Acompanhe seus clientes.</h1>
@@ -220,7 +232,7 @@ export default function FollowUpsPage() {
             <h2>Nenhum follow-up pendente.</h2>
 
             <p className="muted">
-              Quando você publicar um orçamento, o OrçaZap
+              Quando você publicar um orçamento, o OrcaZap
               criará automaticamente um lembrete de retorno.
             </p>
           </div>
@@ -234,163 +246,162 @@ export default function FollowUpsPage() {
               marginTop: "24px",
             }}
           >
-            {pending.map((followUp) => (
-              <div
-                key={followUp.id}
-                className="card"
-                style={{
-                  margin: 0,
-                }}
-              >
+            {pending.map((followUp) => {
+              const quote = followUp.quote;
+
+              return (
                 <div
+                  key={followUp.id}
+                  className="card"
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "20px",
-                    flexWrap: "wrap",
+                    margin: 0,
                   }}
                 >
-                  <div>
-                    <div className="eyebrow">
-                      RETORNO PENDENTE
-                    </div>
-
-                    <h2 style={{ marginTop: "8px" }}>
-                      {followUp.customer?.name ||
-                        "Cliente"}
-                    </h2>
-
-                    {followUp.quote && (
-                      <p className="muted">
-                        Orçamento:{" "}
-                        <strong>
-                          {followUp.quote.number}
-                        </strong>
-                        {" — "}
-                        {followUp.quote.title}
-                      </p>
-                    )}
-
-                    <p className="muted">
-                      Retorno em{" "}
-                      <strong>
-                        {formatDate(followUp.dueAt)}
-                      </strong>{" "}
-                      às{" "}
-                      <strong>
-                        {formatTime(followUp.dueAt)}
-                      </strong>
-                    </p>
-
-                    {followUp.quote && (
-                      <p
-                        style={{
-                          fontSize: "18px",
-                          fontWeight: 700,
-                          marginTop: "10px",
-                        }}
-                      >
-                        {formatMoney(followUp.quote.total)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {followUp.suggestedMessage && (
                   <div
                     style={{
-                      marginTop: "20px",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      background: "#f7f7f5",
-                      lineHeight: 1.6,
-                      color: "#555",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "20px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <strong
+                    <div>
+                      <div className="eyebrow">
+                        RETORNO PENDENTE
+                      </div>
+
+                      <h2 style={{ marginTop: "8px" }}>
+                        {followUp.customer?.name || "Cliente"}
+                      </h2>
+
+                      {quote && (
+                        <p className="muted">
+                          Orçamento:{" "}
+                          <strong>{quote.number}</strong>
+                          {" — "}
+                          {quote.title}
+                        </p>
+                      )}
+
+                      <p className="muted">
+                        Retorno em{" "}
+                        <strong>
+                          {formatDate(followUp.dueAt)}
+                        </strong>{" "}
+                        às{" "}
+                        <strong>
+                          {formatTime(followUp.dueAt)}
+                        </strong>
+                      </p>
+
+                      {quote && (
+                        <p
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 700,
+                            marginTop: "10px",
+                          }}
+                        >
+                          {formatMoney(quote.total)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {followUp.suggestedMessage && (
+                    <div
                       style={{
-                        display: "block",
-                        marginBottom: "6px",
-                        color: "#222",
+                        marginTop: "20px",
+                        padding: "16px",
+                        borderRadius: "10px",
+                        background: "#f7f7f5",
+                        lineHeight: 1.6,
+                        color: "#555",
                       }}
                     >
-                      Mensagem sugerida
-                    </strong>
+                      <strong
+                        style={{
+                          display: "block",
+                          marginBottom: "6px",
+                          color: "#222",
+                        }}
+                      >
+                        Mensagem sugerida
+                      </strong>
 
-                    {followUp.suggestedMessage}
-                  </div>
-                )}
+                      {followUp.suggestedMessage}
+                    </div>
+                  )}
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    marginTop: "20px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() =>
-                      openWhatsApp(followUp)
-                    }
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      marginTop: "20px",
+                      flexWrap: "wrap",
+                    }}
                   >
-                    WhatsApp
-                  </button>
-
-                  {followUp.quote && (
                     <button
                       type="button"
                       className="button"
+                      onClick={() => openWhatsApp(followUp)}
+                    >
+                      WhatsApp
+                    </button>
+
+                    {quote && (
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/orcamentos/${quote.id}`,
+                          )
+                        }
+                      >
+                        Ver orçamento
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={updating === followUp.id}
                       onClick={() =>
-                        router.push(
-                          `/dashboard/orcamentos/${followUp.quote?.id}`,
+                        updateStatus(
+                          followUp.id,
+                          "COMPLETED",
                         )
                       }
                     >
-                      Ver orçamento
+                      {updating === followUp.id
+                        ? "Atualizando..."
+                        : "✓ Concluir"}
                     </button>
-                  )}
 
-                  <button
-                    type="button"
-                    className="button"
-                    disabled={updating === followUp.id}
-                    onClick={() =>
-                      updateStatus(
-                        followUp.id,
-                        "COMPLETED",
-                      )
-                    }
-                  >
-                    ✓ Concluir
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={updating === followUp.id}
-                    onClick={() =>
-                      updateStatus(
-                        followUp.id,
-                        "CANCELLED",
-                      )
-                    }
-                  >
-                    Cancelar
-                  </button>
+                    <button
+                      type="button"
+                      disabled={updating === followUp.id}
+                      onClick={() =>
+                        updateStatus(
+                          followUp.id,
+                          "CANCELLED",
+                        )
+                      }
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         {!loading && !error && completed.length > 0 && (
           <div style={{ marginTop: "40px" }}>
-            <div className="eyebrow">
-              HISTÓRICO
-            </div>
+            <div className="eyebrow">HISTÓRICO</div>
 
             <h2 style={{ marginTop: "8px" }}>
               Follow-ups concluídos
@@ -414,14 +425,53 @@ export default function FollowUpsPage() {
                   }}
                 >
                   <strong>
-                    {followUp.customer?.name ||
-                      "Cliente"}
+                    {followUp.customer?.name || "Cliente"}
                   </strong>
 
                   <div className="muted">
                     {followUp.quote?.number || ""}
                     {" — "}
                     Concluído
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && cancelled.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            <div className="eyebrow">CANCELADOS</div>
+
+            <h2 style={{ marginTop: "8px" }}>
+              Follow-ups cancelados
+            </h2>
+
+            <div
+              style={{
+                display: "grid",
+                gap: "10px",
+                marginTop: "16px",
+              }}
+            >
+              {cancelled.map((followUp) => (
+                <div
+                  key={followUp.id}
+                  className="card"
+                  style={{
+                    margin: 0,
+                    padding: "18px 20px",
+                    opacity: 0.6,
+                  }}
+                >
+                  <strong>
+                    {followUp.customer?.name || "Cliente"}
+                  </strong>
+
+                  <div className="muted">
+                    {followUp.quote?.number || ""}
+                    {" — "}
+                    Cancelado
                   </div>
                 </div>
               ))}

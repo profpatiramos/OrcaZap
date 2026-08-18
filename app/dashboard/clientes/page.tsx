@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
@@ -38,10 +37,14 @@ function formatMoney(value: number) {
 }
 
 export default function NovoOrcamento() {
-  const router = useRouter();
-
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
+
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerEmail, setNewCustomerEmail] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [savingCustomer, setSavingCustomer] = useState(false);
 
   const [serviceName, setServiceName] = useState("");
   const [hours, setHours] = useState("");
@@ -54,6 +57,7 @@ export default function NovoOrcamento() {
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [error, setError] = useState("");
+  const [customerMessage, setCustomerMessage] = useState("");
 
   useEffect(() => {
     async function loadCustomers() {
@@ -76,6 +80,67 @@ export default function NovoOrcamento() {
 
     loadCustomers();
   }, []);
+
+  async function handleCreateCustomer() {
+    if (!newCustomerName.trim()) {
+      setCustomerMessage("Informe o nome do cliente.");
+      return;
+    }
+
+    setSavingCustomer(true);
+    setCustomerMessage("");
+    setError("");
+
+    try {
+      const response = await fetch("/api/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          companyId: COMPANY_ID,
+          name: newCustomerName.trim(),
+          email: newCustomerEmail.trim() || null,
+          phone: newCustomerPhone.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.error || "Não foi possível cadastrar o cliente.",
+        );
+      }
+
+      const newCustomer = data.customer as Customer;
+
+      setCustomers((current) => [
+        newCustomer,
+        ...current,
+      ]);
+
+      setCustomerId(newCustomer.id);
+
+      setNewCustomerName("");
+      setNewCustomerEmail("");
+      setNewCustomerPhone("");
+
+      setShowNewCustomer(false);
+
+      setCustomerMessage(
+        "Cliente cadastrado com sucesso.",
+      );
+    } catch (err) {
+      setCustomerMessage(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cadastrar o cliente.",
+      );
+    } finally {
+      setSavingCustomer(false);
+    }
+  }
 
   async function handleCalculate() {
     if (!customerId) {
@@ -158,43 +223,166 @@ export default function NovoOrcamento() {
       <section className="main">
         <div className="eyebrow">NOVO ORÇAMENTO</div>
 
-        <h1 className="title">Vamos criar sua proposta.</h1>
+        <h1 className="title">
+          Vamos criar sua proposta.
+        </h1>
 
         <p className="subtitle">
           Primeiro, vamos escolher o cliente e entender o serviço.
         </p>
 
         <div className="card">
-          <h2>Cliente</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "16px",
+              marginBottom: "16px",
+            }}
+          >
+            <h2 style={{ margin: 0 }}>
+              Cliente
+            </h2>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewCustomer((current) => !current);
+                setCustomerMessage("");
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#6d45ff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              {showNewCustomer
+                ? "Cancelar"
+                : "+ Cadastrar novo cliente"}
+            </button>
+          </div>
+
+          {showNewCustomer && (
+            <div
+              style={{
+                border: "1px solid #e1e5ef",
+                borderRadius: "12px",
+                padding: "20px",
+                marginBottom: "20px",
+                background: "#fafbff",
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>
+                Novo cliente
+              </h3>
+
+              <label>Nome *</label>
+
+              <input
+                type="text"
+                value={newCustomerName}
+                onChange={(e) =>
+                  setNewCustomerName(e.target.value)
+                }
+                placeholder="Nome do cliente"
+              />
+
+              <label>E-mail</label>
+
+              <input
+                type="email"
+                value={newCustomerEmail}
+                onChange={(e) =>
+                  setNewCustomerEmail(e.target.value)
+                }
+                placeholder="cliente@email.com"
+              />
+
+              <label>Telefone / WhatsApp</label>
+
+              <input
+                type="text"
+                value={newCustomerPhone}
+                onChange={(e) =>
+                  setNewCustomerPhone(e.target.value)
+                }
+                placeholder="(45) 99999-9999"
+              />
+
+              <button
+                type="button"
+                onClick={handleCreateCustomer}
+                disabled={savingCustomer}
+                className="button"
+              >
+                {savingCustomer
+                  ? "Salvando..."
+                  : "Cadastrar cliente"}
+              </button>
+
+              {customerMessage && (
+                <div
+                  style={{
+                    marginTop: "12px",
+                    color: customerMessage.includes("sucesso")
+                      ? "#16834b"
+                      : "#c62828",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {customerMessage}
+                </div>
+              )}
+            </div>
+          )}
 
           <label>Selecione o cliente</label>
 
           {loadingCustomers ? (
-            <p className="muted">Carregando clientes...</p>
+            <p className="muted">
+              Carregando clientes...
+            </p>
           ) : customers.length === 0 ? (
             <p className="muted">
-              Nenhum cliente cadastrado. Cadastre um cliente antes de criar
-              um orçamento.
+              Nenhum cliente cadastrado. Use o botão acima para cadastrar
+              seu primeiro cliente.
             </p>
           ) : (
             <>
               <select
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  setCustomerMessage("");
+                }}
               >
-                <option value="">Selecione um cliente</option>
+                <option value="">
+                  Selecione um cliente
+                </option>
 
                 {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
+                  <option
+                    key={customer.id}
+                    value={customer.id}
+                  >
                     {customer.name}
                   </option>
                 ))}
               </select>
 
               {selectedCustomer && (
-                <p className="muted" style={{ marginTop: "10px" }}>
+                <p
+                  className="muted"
+                  style={{ marginTop: "10px" }}
+                >
                   {selectedCustomer.email || ""}
-                  {selectedCustomer.email && selectedCustomer.phone
+                  {selectedCustomer.email &&
+                  selectedCustomer.phone
                     ? " • "
                     : ""}
                   {selectedCustomer.phone || ""}
@@ -204,7 +392,10 @@ export default function NovoOrcamento() {
           )}
         </div>
 
-        <div className="card" style={{ marginTop: "24px" }}>
+        <div
+          className="card"
+          style={{ marginTop: "24px" }}
+        >
           <h2>Dados do serviço</h2>
 
           <label>Nome do serviço</label>
@@ -212,7 +403,9 @@ export default function NovoOrcamento() {
           <input
             type="text"
             value={serviceName}
-            onChange={(e) => setServiceName(e.target.value)}
+            onChange={(e) =>
+              setServiceName(e.target.value)
+            }
             placeholder="Ex.: Instalação elétrica"
           />
 
@@ -222,7 +415,9 @@ export default function NovoOrcamento() {
             type="number"
             min="0"
             value={hours}
-            onChange={(e) => setHours(e.target.value)}
+            onChange={(e) =>
+              setHours(e.target.value)
+            }
             placeholder="Ex.: 8"
           />
 
@@ -233,7 +428,9 @@ export default function NovoOrcamento() {
             min="0"
             step="0.01"
             value={hourlyRate}
-            onChange={(e) => setHourlyRate(e.target.value)}
+            onChange={(e) =>
+              setHourlyRate(e.target.value)
+            }
             placeholder="Ex.: 80"
           />
 
@@ -244,7 +441,9 @@ export default function NovoOrcamento() {
             min="0"
             step="0.01"
             value={materials}
-            onChange={(e) => setMaterials(e.target.value)}
+            onChange={(e) =>
+              setMaterials(e.target.value)
+            }
             placeholder="R$ 0,00"
           />
 
@@ -255,7 +454,9 @@ export default function NovoOrcamento() {
             min="0"
             step="0.01"
             value={otherExpenses}
-            onChange={(e) => setOtherExpenses(e.target.value)}
+            onChange={(e) =>
+              setOtherExpenses(e.target.value)
+            }
             placeholder="R$ 0,00"
           />
 
@@ -266,7 +467,9 @@ export default function NovoOrcamento() {
             min="0"
             max="90"
             value={margin}
-            onChange={(e) => setMargin(e.target.value)}
+            onChange={(e) =>
+              setMargin(e.target.value)
+            }
             placeholder="Ex.: 40"
           />
 
@@ -276,27 +479,42 @@ export default function NovoOrcamento() {
             disabled={loading || !customerId}
             className="button"
           >
-            {loading ? "Calculando..." : "Calcular preço"}
+            {loading
+              ? "Calculando..."
+              : "Calcular preço"}
           </button>
 
           {error && (
-            <div className="error-box" style={{ marginTop: "16px" }}>
+            <div
+              className="error-box"
+              style={{ marginTop: "16px" }}
+            >
               {error}
             </div>
           )}
         </div>
 
         {result && (
-          <div className="card result-card" style={{ marginTop: "24px" }}>
-            <div className="eyebrow">RESULTADO DA PRECIFICAÇÃO</div>
+          <div
+            className="card result-card"
+            style={{ marginTop: "24px" }}
+          >
+            <div className="eyebrow">
+              RESULTADO DA PRECIFICAÇÃO
+            </div>
 
-            <p className="muted" style={{ marginBottom: "4px" }}>
+            <p
+              className="muted"
+              style={{ marginBottom: "4px" }}
+            >
               Cliente
             </p>
 
             <h2>{selectedCustomer?.name}</h2>
 
-            <p className="muted">{serviceName}</p>
+            <p className="muted">
+              {serviceName}
+            </p>
 
             <div className="price-highlight">
               {formatMoney(result.recommendedPrice)}

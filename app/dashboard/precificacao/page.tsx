@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import DashboardBackButton from "@/app/components/DashboardBackButton";
 
 type ServiceCost = {
   id: string;
@@ -23,6 +23,8 @@ type CostForm = {
   amount: string;
 };
 
+const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
+
 function formatMoney(value: string | number) {
   return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -31,8 +33,6 @@ function formatMoney(value: string | number) {
 }
 
 export default function PrecificacaoPage() {
-  const router = useRouter();
-
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,7 +53,9 @@ export default function PrecificacaoPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch("/api/services");
+      const response = await fetch(
+        `/api/services?companyId=${COMPANY_ID}`,
+      );
 
       const data = await response.json();
 
@@ -87,6 +89,18 @@ export default function PrecificacaoPage() {
     setCosts([]);
     setMessage("");
     setError("");
+  }
+
+  function openNewServiceForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    if (saving) return;
+
+    setShowForm(false);
+    resetForm();
   }
 
   function addCost() {
@@ -127,17 +141,40 @@ export default function PrecificacaoPage() {
       Number(hourlyRate || 0) *
       Number(defaultQuantity || 0);
 
-    const materials = costs.reduce(
+    const additionalCosts = costs.reduce(
       (total, cost) => total + Number(cost.amount || 0),
       0,
     );
 
-    return labor + materials;
+    return labor + additionalCosts;
   }
 
   async function saveService() {
     if (!name.trim()) {
       setError("Informe o nome do serviço.");
+      return;
+    }
+
+    const parsedHourlyRate = Number(hourlyRate || 0);
+    const parsedQuantity = Number(defaultQuantity || 1);
+
+    if (parsedHourlyRate < 0) {
+      setError("O valor da hora não pode ser negativo.");
+      return;
+    }
+
+    if (parsedQuantity <= 0) {
+      setError("Informe uma quantidade de horas maior que zero.");
+      return;
+    }
+
+    const invalidCost = costs.find(
+      (cost) =>
+        cost.name.trim() && Number(cost.amount || 0) < 0,
+    );
+
+    if (invalidCost) {
+      setError("Os valores dos custos não podem ser negativos.");
       return;
     }
 
@@ -152,14 +189,14 @@ export default function PrecificacaoPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name,
-          description,
-          baseHourlyRate: Number(hourlyRate || 0),
-          defaultQuantity: Number(defaultQuantity || 1),
+          name: name.trim(),
+          description: description.trim(),
+          baseHourlyRate: parsedHourlyRate,
+          defaultQuantity: parsedQuantity,
           costs: costs
             .filter((cost) => cost.name.trim())
             .map((cost) => ({
-              name: cost.name,
+              name: cost.name.trim(),
               amount: Number(cost.amount || 0),
             })),
         }),
@@ -174,8 +211,8 @@ export default function PrecificacaoPage() {
       }
 
       setMessage("Serviço cadastrado com sucesso!");
-      resetForm();
       setShowForm(false);
+      resetForm();
 
       await loadServices();
     } catch (err) {
@@ -200,18 +237,9 @@ export default function PrecificacaoPage() {
       </header>
 
       <section className="main">
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          style={{
-            marginBottom: "24px",
-            background: "transparent",
-            color: "#555",
-            padding: 0,
-          }}
-        >
-          ← Voltar ao painel
-        </button>
+        <div style={{ marginBottom: "24px" }}>
+          <DashboardBackButton />
+        </div>
 
         <div
           style={{
@@ -236,10 +264,8 @@ export default function PrecificacaoPage() {
           <button
             type="button"
             className="button"
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-            }}
+            onClick={openNewServiceForm}
+            disabled={showForm}
           >
             + Novo serviço
           </button>
@@ -268,6 +294,16 @@ export default function PrecificacaoPage() {
             }}
           >
             <div className="error-box">{error}</div>
+
+            <button
+              type="button"
+              className="button"
+              onClick={loadServices}
+              disabled={loading}
+              style={{ marginTop: "16px" }}
+            >
+              Tentar novamente
+            </button>
           </div>
         )}
 
@@ -296,7 +332,8 @@ export default function PrecificacaoPage() {
 
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
+                disabled={saving}
                 style={{
                   background: "transparent",
                   color: "#666",
@@ -355,7 +392,7 @@ export default function PrecificacaoPage() {
 
                 <input
                   type="number"
-                  min="0"
+                  min="0.01"
                   step="0.01"
                   value={defaultQuantity}
                   onChange={(e) =>
@@ -400,6 +437,7 @@ export default function PrecificacaoPage() {
                   justifyContent: "space-between",
                   alignItems: "center",
                   gap: "16px",
+                  flexWrap: "wrap",
                 }}
               >
                 <div>
@@ -414,6 +452,7 @@ export default function PrecificacaoPage() {
                 <button
                   type="button"
                   onClick={addCost}
+                  disabled={saving}
                   style={{
                     background: "transparent",
                     color: "#111",
@@ -453,7 +492,7 @@ export default function PrecificacaoPage() {
                     style={{
                       display: "grid",
                       gridTemplateColumns:
-                        "1fr 180px auto",
+                        "minmax(0, 1fr) 180px auto",
                       gap: "10px",
                       alignItems: "center",
                     }}
@@ -469,6 +508,7 @@ export default function PrecificacaoPage() {
                         )
                       }
                       placeholder="Ex.: Material elétrico"
+                      disabled={saving}
                     />
 
                     <input
@@ -484,11 +524,13 @@ export default function PrecificacaoPage() {
                         )
                       }
                       placeholder="Valor"
+                      disabled={saving}
                     />
 
                     <button
                       type="button"
                       onClick={() => removeCost(index)}
+                      disabled={saving}
                       style={{
                         background: "transparent",
                         color: "#b42318",
@@ -523,6 +565,13 @@ export default function PrecificacaoPage() {
               >
                 {formatMoney(calculateCostTotal())}
               </div>
+
+              <p
+                className="muted"
+                style={{ marginTop: "6px" }}
+              >
+                Mão de obra + custos adicionais cadastrados.
+              </p>
             </div>
 
             <div
@@ -531,11 +580,13 @@ export default function PrecificacaoPage() {
                 gap: "10px",
                 justifyContent: "flex-end",
                 marginTop: "24px",
+                flexWrap: "wrap",
               }}
             >
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
+                disabled={saving}
                 style={{
                   background: "transparent",
                   color: "#555",
@@ -586,10 +637,7 @@ export default function PrecificacaoPage() {
                 <button
                   type="button"
                   className="button"
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(true);
-                  }}
+                  onClick={openNewServiceForm}
                   style={{ marginTop: "16px" }}
                 >
                   Cadastrar primeiro serviço
@@ -620,16 +668,14 @@ export default function PrecificacaoPage() {
                   <div
                     style={{
                       display: "flex",
-                      justifyContent:
-                        "space-between",
+                      justifyContent: "space-between",
                       alignItems: "flex-start",
                       gap: "20px",
+                      flexWrap: "wrap",
                     }}
                   >
                     <div>
-                      <div className="eyebrow">
-                        SERVIÇO
-                      </div>
+                      <div className="eyebrow">SERVIÇO</div>
 
                       <h2
                         style={{
@@ -655,9 +701,7 @@ export default function PrecificacaoPage() {
                         Custo estimado
                       </div>
 
-                      <div
-                        className="price-highlight"
-                      >
+                      <div className="price-highlight">
                         {formatMoney(totalCost)}
                       </div>
                     </div>
@@ -754,9 +798,7 @@ export default function PrecificacaoPage() {
                               gap: "20px",
                             }}
                           >
-                            <span>
-                              {cost.name}
-                            </span>
+                            <span>{cost.name}</span>
 
                             <strong>
                               {formatMoney(cost.amount)}
