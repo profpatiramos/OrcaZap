@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const COMPANY_ID = "cmstaaoh30000nt60wfy3hm3r";
+import { getCurrentCompany } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const services = await db.service.findMany({
       where: {
-        companyId: COMPANY_ID,
+        companyId: company.id,
         active: true,
       },
       include: {
@@ -44,6 +55,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
 
     const {
@@ -66,18 +89,22 @@ export async function POST(request: Request) {
 
     const service = await db.service.create({
       data: {
-        companyId: COMPANY_ID,
+        companyId: company.id,
+
         name: String(name).trim(),
+
         description:
           description && String(description).trim()
             ? String(description).trim()
             : null,
+
         baseHourlyRate:
           baseHourlyRate !== undefined &&
           baseHourlyRate !== null &&
           baseHourlyRate !== ""
             ? Number(baseHourlyRate)
             : null,
+
         defaultQuantity:
           defaultQuantity !== undefined &&
           defaultQuantity !== null &&
