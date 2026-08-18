@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentCompany } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const followUps = await db.followUp.findMany({
+      where: {
+        companyId: company.id,
+      },
       include: {
         customer: true,
         quote: true,
@@ -18,12 +34,12 @@ export async function GET() {
       followUps,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao carregar follow-ups:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        error: "Nao foi possivel carregar os follow-ups.",
+        error: "Não foi possível carregar os follow-ups.",
       },
       { status: 500 },
     );
@@ -32,22 +48,32 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
 
     const {
-      companyId,
       customerId,
       quoteId,
       dueAt,
       suggestedMessage,
     } = body;
 
-    if (!companyId || !customerId || !dueAt) {
+    if (!customerId || !dueAt) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "Empresa, cliente e data do follow-up sao obrigatorios.",
+          error: "Cliente e data do follow-up são obrigatórios.",
         },
         { status: 400 },
       );
@@ -55,7 +81,7 @@ export async function POST(request: Request) {
 
     const followUp = await db.followUp.create({
       data: {
-        companyId,
+        companyId: company.id,
         customerId,
         quoteId: quoteId || null,
         dueAt: new Date(dueAt),
@@ -72,12 +98,12 @@ export async function POST(request: Request) {
       followUp,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao criar follow-up:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        error: "Nao foi possivel criar o follow-up.",
+        error: "Não foi possível criar o follow-up.",
       },
       { status: 500 },
     );

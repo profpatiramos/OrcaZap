@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentCompany } from "@/lib/auth";
 
 type Params = {
   params: Promise<{
@@ -12,24 +13,57 @@ export async function PATCH(
   { params }: Params,
 ) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
     const { status } = body;
 
-    if (!["PENDING", "COMPLETED", "CANCELLED"].includes(status)) {
+    if (
+      status !== "PENDING" &&
+      status !== "COMPLETED" &&
+      status !== "CANCELLED"
+    ) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Status invalido.",
+          error: "Status de follow-up inválido.",
         },
         { status: 400 },
       );
     }
 
-    const followUp = await db.followUp.update({
+    const followUp = await db.followUp.findFirst({
       where: {
         id,
+        companyId: company.id,
+      },
+    });
+
+    if (!followUp) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Follow-up não encontrado.",
+        },
+        { status: 404 },
+      );
+    }
+
+    const updatedFollowUp = await db.followUp.update({
+      where: {
+        id: followUp.id,
       },
       data: {
         status,
@@ -42,15 +76,19 @@ export async function PATCH(
 
     return NextResponse.json({
       ok: true,
-      followUp,
+      followUp: updatedFollowUp,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Erro ao atualizar follow-up:",
+      error,
+    );
 
     return NextResponse.json(
       {
         ok: false,
-        error: "Nao foi possivel atualizar o follow-up.",
+        error:
+          "Não foi possível atualizar o follow-up.",
       },
       { status: 500 },
     );

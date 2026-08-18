@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentCompany } from "@/lib/auth";
 
 type Params = {
   params: Promise<{
@@ -12,6 +13,18 @@ export async function PATCH(
   { params }: Params,
 ) {
   try {
+    const company = await getCurrentCompany();
+
+    if (!company) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Usuário não autenticado ou sem empresa.",
+        },
+        { status: 401 },
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -30,9 +43,10 @@ export async function PATCH(
       );
     }
 
-    const followUp = await db.followUp.findUnique({
+    const followUp = await db.followUp.findFirst({
       where: {
         id,
+        companyId: company.id,
       },
     });
 
@@ -49,10 +63,14 @@ export async function PATCH(
     const updatedFollowUp =
       await db.followUp.update({
         where: {
-          id,
+          id: followUp.id,
         },
         data: {
           status,
+        },
+        include: {
+          customer: true,
+          quote: true,
         },
       });
 
