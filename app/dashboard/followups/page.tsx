@@ -175,7 +175,14 @@ export default function FollowUpsPage() {
   );
 
   return (
-    <main>
+    <main
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        boxSizing: "border-box",
+        overflowX: "hidden",
+      }}
+    >
       <header className="top">
         <div className="brand">
           Orca<span>Zap</span>
@@ -194,7 +201,15 @@ export default function FollowUpsPage() {
         </div>
       </header>
 
-      <section className="main">
+      <section
+        style={{
+          width: "100%",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          padding: "40px 24px 80px",
+          boxSizing: "border-box",
+        }}
+      >
         <div className="eyebrow">FOLLOW-UPS</div>
 
         <h1 className="title">Acompanhe seus clientes.</h1>
@@ -265,7 +280,7 @@ export default function FollowUpsPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <div>
+                    <div style={{ minWidth: 0, width: "100%" }}>
                       <div className="eyebrow">
                         RETORNO PENDENTE
                       </div>
@@ -275,7 +290,12 @@ export default function FollowUpsPage() {
                       </h2>
 
                       {quote && (
-                        <p className="muted">
+                        <p
+                          className="muted"
+                          style={{
+                            overflowWrap: "anywhere",
+                          }}
+                        >
                           Orçamento:{" "}
                           <strong>{quote.number}</strong>
                           {" — "}
@@ -317,6 +337,7 @@ export default function FollowUpsPage() {
                         background: "#f7f7f5",
                         lineHeight: 1.6,
                         color: "#555",
+                        overflowWrap: "anywhere",
                       }}
                     >
                       <strong
