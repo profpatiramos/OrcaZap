@@ -64,12 +64,11 @@ export default function FollowUpsPage() {
       setError("");
 
       const response = await fetch("/api/follow-ups");
-
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.error || "NÃ£o foi possÃ­vel carregar os follow-ups.",
+          data.error || "Não foi possível carregar os follow-ups.",
         );
       }
 
@@ -78,7 +77,7 @@ export default function FollowUpsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "NÃ£o foi possÃ­vel carregar os follow-ups.",
+          : "Não foi possível carregar os follow-ups.",
       );
     } finally {
       setLoading(false);
@@ -111,7 +110,7 @@ export default function FollowUpsPage() {
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.error || "NÃ£o foi possÃ­vel atualizar o follow-up.",
+          data.error || "Não foi possível atualizar o follow-up.",
         );
       }
 
@@ -120,7 +119,7 @@ export default function FollowUpsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "NÃ£o foi possÃ­vel atualizar o follow-up.",
+          : "Não foi possível atualizar o follow-up.",
       );
     } finally {
       setUpdating("");
@@ -134,7 +133,7 @@ export default function FollowUpsPage() {
 
     if (!phone) {
       setError(
-        "Este cliente nÃ£o possui telefone ou WhatsApp cadastrado.",
+        "Este cliente não possui telefone ou WhatsApp cadastrado.",
       );
       return;
     }
@@ -143,7 +142,7 @@ export default function FollowUpsPage() {
 
     if (!cleanPhone) {
       setError(
-        "O telefone ou WhatsApp cadastrado para este cliente Ã© invÃ¡lido.",
+        "O telefone ou WhatsApp cadastrado para este cliente é inválido.",
       );
       return;
     }
@@ -154,7 +153,7 @@ export default function FollowUpsPage() {
 
     const message =
       followUp.suggestedMessage ||
-      `OlÃ¡, ${followUp.customer?.name || ""}! Tudo bem? Estou entrando em contato para saber se vocÃª conseguiu avaliar o orÃ§amento ${followUp.quote?.number || ""}. Fico Ã  disposiÃ§Ã£o para qualquer dÃºvida ou ajuste.`;
+      `Olá, ${followUp.customer?.name || ""}! Tudo bem? Estou entrando em contato para saber se você conseguiu avaliar o orçamento ${followUp.quote?.number || ""}. Fico à disposição para qualquer dúvida ou ajuste.`;
 
     const url =
       `https://wa.me/${whatsappPhone}` +
@@ -201,7 +200,7 @@ export default function FollowUpsPage() {
         <h1 className="title">Acompanhe seus clientes.</h1>
 
         <p className="subtitle">
-          Saiba quais orÃ§amentos precisam de retorno.
+          Saiba quais orçamentos precisam de retorno.
         </p>
 
         {error && (
@@ -232,8 +231,8 @@ export default function FollowUpsPage() {
             <h2>Nenhum follow-up pendente.</h2>
 
             <p className="muted">
-              Quando vocÃª publicar um orÃ§amento, o OrcaZap
-              criarÃ¡ automaticamente um lembrete de retorno.
+              Quando você publicar um orçamento, o OrcaZap
+              criará automaticamente um lembrete de retorno.
             </p>
           </div>
         )}
@@ -277,9 +276,9 @@ export default function FollowUpsPage() {
 
                       {quote && (
                         <p className="muted">
-                          OrÃ§amento:{" "}
+                          Orçamento:{" "}
                           <strong>{quote.number}</strong>
-                          {" â€” "}
+                          {" — "}
                           {quote.title}
                         </p>
                       )}
@@ -289,7 +288,7 @@ export default function FollowUpsPage() {
                         <strong>
                           {formatDate(followUp.dueAt)}
                         </strong>{" "}
-                        Ã s{" "}
+                        às{" "}
                         <strong>
                           {formatTime(followUp.dueAt)}
                         </strong>
@@ -360,7 +359,7 @@ export default function FollowUpsPage() {
                           )
                         }
                       >
-                        Ver orÃ§amento
+                        Ver orçamento
                       </button>
                     )}
 
@@ -377,11 +376,12 @@ export default function FollowUpsPage() {
                     >
                       {updating === followUp.id
                         ? "Atualizando..."
-                        : "âœ“ Concluir"}
+                        : "✓ Concluir"}
                     </button>
 
                     <button
                       type="button"
+                      className="button"
                       disabled={updating === followUp.id}
                       onClick={() =>
                         updateStatus(
@@ -401,10 +401,10 @@ export default function FollowUpsPage() {
 
         {!loading && !error && completed.length > 0 && (
           <div style={{ marginTop: "40px" }}>
-            <div className="eyebrow">HISTÃ“RICO</div>
+            <div className="eyebrow">HISTÓRICO</div>
 
             <h2 style={{ marginTop: "8px" }}>
-              Follow-ups concluÃ­dos
+              Follow-ups concluídos
             </h2>
 
             <div
@@ -430,8 +430,8 @@ export default function FollowUpsPage() {
 
                   <div className="muted">
                     {followUp.quote?.number || ""}
-                    {" â€” "}
-                    ConcluÃ­do
+                    {" — "}
+                    Concluído
                   </div>
                 </div>
               ))}
@@ -470,7 +470,7 @@ export default function FollowUpsPage() {
 
                   <div className="muted">
                     {followUp.quote?.number || ""}
-                    {" â€” "}
+                    {" — "}
                     Cancelado
                   </div>
                 </div>
