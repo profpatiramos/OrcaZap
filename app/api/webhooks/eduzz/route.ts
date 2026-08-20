@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { Resend } from "resend";
 import { db } from "@/lib/db";
 
 type EduzzWebhook = {
@@ -65,6 +66,7 @@ function isValidSignature(
 export async function POST(request: Request) {
   try {
     const secret = process.env.EDUZZ_WEBHOOK_SECRET;
+    const resendApiKey = process.env.RESEND_API_KEY;
 
     if (!secret) {
       console.error(
@@ -75,6 +77,20 @@ export async function POST(request: Request) {
         {
           ok: false,
           error: "Webhook Eduzz não configurado.",
+        },
+        { status: 500 },
+      );
+    }
+
+    if (!resendApiKey) {
+      console.error(
+        "RESEND_API_KEY não configurado.",
+      );
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Serviço de e-mail não configurado.",
         },
         { status: 500 },
       );
@@ -127,7 +143,8 @@ export async function POST(request: Request) {
     }
 
     const email = buyer.email.trim().toLowerCase();
-    const name = buyer.name?.trim() || "Cliente OrcaZap";
+    const name =
+      buyer.name?.trim() || "Cliente OrcaZap";
 
     const existingUser = await db.user.findUnique({
       where: {
@@ -159,10 +176,11 @@ export async function POST(request: Request) {
       Date.now() + 48 * 60 * 60 * 1000,
     );
 
-    const temporaryPasswordHash = await bcrypt.hash(
-      crypto.randomBytes(32).toString("hex"),
-      12,
-    );
+    const temporaryPasswordHash =
+      await bcrypt.hash(
+        crypto.randomBytes(32).toString("hex"),
+        12,
+      );
 
     const companyName =
       name || "Minha empresa";
@@ -229,25 +247,147 @@ export async function POST(request: Request) {
     );
 
     const activationUrl =
-      `${process.env.NEXT_PUBLIC_APP_URL || "https://orcazap.mydigitalbox.online"}` +
+      `${
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "https://orcazap.mydigitalbox.online"
+      }` +
       `/ativar?token=${activationToken}`;
 
-    console.log("Novo cliente criado via Eduzz:", {
-      userId: result.user.id,
-      companyId: result.company.id,
-      email,
-      activationUrl,
-      invoiceId: payload.data?.id || null,
-      offer: payload.data?.offer?.name || null,
-      paidValue: payload.data?.paid?.value || null,
-    });
+    const resend = new Resend(resendApiKey);
+
+    const { data: emailData, error: emailError } =
+      await resend.emails.send({
+        from: "OrcaZap <noreply@mydigitalbox.online>",
+        to: [email],
+        subject: "Ative sua conta OrcaZap",
+        html: `
+          <div
+            style="
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 40px 20px;
+              color: #172033;
+            "
+          >
+            <h1
+              style="
+                font-size: 32px;
+                margin-bottom: 10px;
+              "
+            >
+              <span style="color: #6d3df5;">
+                Orça
+              </span>Zap
+            </h1>
+
+            <h2>Olá, ${name}!</h2>
+
+            <p>
+              Seu pagamento foi confirmado e sua
+              conta no OrcaZap já está pronta.
+            </p>
+
+            <p>
+              Para começar a utilizar o sistema,
+              clique no botão abaixo e crie sua senha:
+            </p>
+
+            <p style="margin: 30px 0;">
+              <a
+                href="${activationUrl}"
+                style="
+                  display: inline-block;
+                  background: #6d3df5;
+                  color: #ffffff;
+                  text-decoration: none;
+                  padding: 14px 24px;
+                  border-radius: 8px;
+                  font-weight: bold;
+                "
+              >
+                Ativar minha conta
+              </a>
+            </p>
+
+            <p
+              style="
+                font-size: 14px;
+                color: #667085;
+              "
+            >
+              Este link é válido por 48 horas.
+            </p>
+
+            <p
+              style="
+                font-size: 14px;
+                color: #667085;
+              "
+            >
+              Se você não realizou esta compra,
+              pode ignorar este e-mail.
+            </p>
+
+            <hr
+              style="
+                margin: 30px 0;
+                border: 0;
+                border-top: 1px solid #eeeeee;
+              "
+            />
+
+            <p
+              style="
+                font-size: 12px;
+                color: #98a2b3;
+              "
+            >
+              OrcaZap — My Digital Box
+            </p>
+          </div>
+        `,
+      });
+
+    if (emailError) {
+      console.error(
+        "Erro ao enviar e-mail de ativação:",
+        emailError,
+      );
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Usuário criado, mas não foi possível enviar o e-mail de ativação.",
+          userId: result.user.id,
+          companyId: result.company.id,
+        },
+        { status: 500 },
+      );
+    }
+
+    console.log(
+      "Novo cliente criado via Eduzz e e-mail enviado:",
+      {
+        userId: result.user.id,
+        companyId: result.company.id,
+        email,
+        emailId: emailData?.id || null,
+        invoiceId: payload.data?.id || null,
+        offer: payload.data?.offer?.name || null,
+        paidValue:
+          payload.data?.paid?.value || null,
+      },
+    );
 
     return NextResponse.json({
       ok: true,
       created: true,
       userId: result.user.id,
       companyId: result.company.id,
-      activationUrl,
+      emailSent: true,
+      emailId: emailData?.id || null,
     });
   } catch (error) {
     console.error(
@@ -258,7 +398,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Não foi possível processar o webhook.",
+        error:
+          "Não foi possível processar o webhook.",
       },
       { status: 500 },
     );
